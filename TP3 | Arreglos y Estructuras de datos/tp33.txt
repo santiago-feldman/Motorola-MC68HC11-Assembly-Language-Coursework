@@ -1,0 +1,142 @@
+
+*****************************************************************
+* EJERCICIO 3                                                   *
+*                                                               *
+* El programa retorna el valor de una celda particular          *
+* perteneciente a un arreglo bidimensional de 4x3 celdas.       *
+*****************************************************************
+
+                p68H11                  ;declara el modelo del microprocesador
+M               EQU     4               ;cantidad de filas
+N               EQU     3               ;cantidad de columnas
+EL_SIZE         EQU     2               ;tamaño de los elementos de la matriz
+matriz          EQU     $2200
+AR_SIZE         EQU     EL_SIZE*N
+i               SET     3               ;fila en la que se ubica una celda particular.
+j               SET     2               ;columna en la que se ubica la celda part.
+
+
+*****************************************************************
+* MAIN PROGRAM                                                  *
+*                                                               *
+* Llama a la subrutina "get_cell" que retorna el valor de la    *
+* celda requerida. Realiza el pasaje de parámetros por stack de *
+* datos requeridos por la subrutina.                            *
+*****************************************************************
+
+                ORG     $2000
+                lds     #stk_ini        ;inicia el stack
+                ldx     #matriz         ;carga la matriz en el puntero x
+                ldaa    #i              ;carga la fila
+                ldab    #j              ;carga la columna
+                pshx                    ;pasa la posición de memoria donde inica la
+                psha                    ; matriz al stack ,pasa la fila y columna de
+                pshb                    ; una celda particular de la matriz al stack
+                ldaa    #M              ;carga la cantidad de filas
+                ldab    #N              ;carga la cantidad de columnas
+                psha                    ;pasa la cantidad de filas y columnas al stack
+                pshb
+                ldaa    #AR_SIZE
+                ldab    #EL_SIZE
+                psha                    ;pasa al stack el producto entre el tamaño de
+                pshb                    ; los elementos de la matriz y su cantidad de
+                clra                    ;columnas.Tamaño de elementos de la matriz a stack
+                psha                    ;deja dos espacios libres en el stack para
+                psha                    ;guardar el espacio col,fil particular
+                jsr     get_cell        ;salta a la subrutina "get_cell"
+                pula                    ;guarda el valor de la celda deseada en el
+                pulb                    ; registro D
+fin             bra     fin             ;finaliza el programa
+
+*****************************************************************
+* SUBRUTINA GET_CELL                                            *
+*                                                               *
+* Carga el valor de una celda particular de la matriz de 4x3.   *
+* Antes de retornarlo al programa principal, llama a la         *
+* subrutina "chk_status", que verifica que tal valor sea válido.*
+* El pasaje de los parámetros requeridos por tal subrutina se   *
+* realiza por stack; son los mismos requeridos por la subrutina *
+* "get_cell".                                                   *
+*****************************************************************
+
+get_cell        ORG     *
+                pshx                    ;hace un backup del registro X
+                tsx                     ;crea un frame pointer (FP) en el stack
+                pshy                    ;hace backup del resto de los registros
+                pshb
+                psha
+                ldy     12,X            ;carga la posición donde inicia la matriz
+                ldaa    11,X            ;carga la fila de la celda particular (i)
+                ldab    7,X             ;carga AR_SIZE
+                mul                     ;i*AR_SIZE
+                aby                     ;matriz+i*AR_SIZE
+                ldaa    10,X            ;carga la columna de la celda particular
+                ldab    6,X             ;carga EL_SIZE
+                mul                     ;j*EL_SIZE
+                aby                     ;matriz+i*AR_SIZE+j*EL_SIZE luego carga el
+                ldd     0,Y             ; contenido de la celda particular ,guarda
+                ldab    5,X             ; el byte menos significativo y guarda dicho
+                ldaa    4,X             ;contenido en la zona de stack Se guarda el byte más
+                jsr     chk_status      ; significativo y salta a la subrutina
+                pula                    ; "chk_status", restore de los registros
+                pulb
+                puly
+                pulx
+                rts                     ;retorna al programa principal
+
+*****************************************************************
+* SUBRUTINA CHK_STATUS                                          *
+*                                                               *
+* Verifica que los valores de fila y columna sean válidos; es   *
+* decir, que el elemento requerido pertenezca a la matriz.      *
+* Devuelve el flag de carry en uno si ocurrió un error y en     *
+* cero si se pudo obtener el valor deseado.                     *
+*****************************************************************
+
+chk_status      ORG     *
+                pshx                    ;hace un backup del registro X
+                tsx                     ;crea el FP
+                pshy                    ;backup del resto de los registros
+                pshb
+                psha
+                ldaa    19,X            ;carga la fila de la celda particular
+                ldab    17,X            ;carga la cantidad de filas de la matriz
+                decb                    ;decrementa el valor de dicha cantidad,para
+                cba                     ; compararlo con la enumeración de las filas
+                bhi     mayor           ; Verifica si el valor de la fila corresponde
+                ldaa    18,X            ; orden de la matriz si no corresponde, salta a
+                ldab    16,X            ; "mayor".Carga la columna de la celda
+                decb                    ; particular al cargar la cantidad de columnas
+                cba                     ; de la matriz realiza el mismo procedimiento
+                bhi     mayor           ; para las columnas que con las filas
+                clc                     ;el resultado es válido y el flag de carry será 0
+                bra     vuelta
+mayor           sec                     ;ocurrió un error, el elemento seleccionado no
+vuelta          pula                    ;pertenece a la matriz y el flag de carry será
+                pulb                    ;1. Se hace restore de los registros
+                puly
+                pulx
+                rts                     ;retorna a la subrutina "get_cell"
+
+*****************************************************************
+* ÁREA DE ARREGLO                                               *
+*                                                               *
+* Se define un arreglo bidimensional de 4x3 celdas que          *
+* contienen números no signados de 16 bits.                     *
+*****************************************************************
+
+                ORG     matriz
+                RMB     EL_SIZE*M*N
+
+*****************************************************************
+* ÁREA DE STACK                                                 *
+*                                                               *
+* Se necesitan 26 posiciones para el pasaje de parámetros a las *
+* subrutinas correspondientes; se deja un margen extra.         *
+*****************************************************************
+
+                ORG     $2600
+stack           RMB     100
+stk_ini         EQU     *-1
+
+                END

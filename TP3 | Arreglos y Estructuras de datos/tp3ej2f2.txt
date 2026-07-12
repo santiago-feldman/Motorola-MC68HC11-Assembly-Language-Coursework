@@ -1,0 +1,47 @@
+        p68h11          ;declara el micropocesador
+
+*****************************************************************
+*                        ÁREA DE ARREGLO                        *
+*     Se crea un arreglo de 6 elementos de dos byte cada uno    *
+*****************************************************************
+RAM     equ     $2000
+N       equ     6       ;declara la cantidad de elementos del arreglo
+EL_SIZE equ     2       ;declara la cantidad de bytes de los elementos del arreglo
+TERM    equ     $3100   ;posición de memoria donde se anota el elemento mayor
+
+*****************************************************************
+*                         MAIN PROGRAM                          *
+*     Compara los elementos del arreglo y el mayor de todos     *
+*     lo guarda en la posición de memoria deseada               *
+*****************************************************************
+
+        org     $3000
+        ldaa    #0              ;define el indice que empieza a comparar
+        ldab    #EL_SIZE
+        ldx     #arreglo
+        ldy     #N              ;inicia contador de elementos a comparar
+        mul
+        abx
+menor   ldd     0,x             ;toma un elemento del arreglo
+mayor   inx                     ;ubica el puntero en el siguiente  elemento
+        inx
+        dey                     ;decrementa el contador de elementos
+        beq     anoto           ;si el contador es cero termina de comparar
+        cpd     0,x             ;compara el elemento con el que le sigue
+        bhi     mayor           ;si es mayor el primero, lo compara con otro elemento
+        bra     menor           ;si es menor el primer, compara el siguiente con otro elemento
+anoto   std     TERM            ;anota el mayor elemento
+fin     jmp     fin             ;finaliza el programa
+
+
+*****************************************************************
+*                         ÁREA DE DATOS                         *
+*     Lista de los elementos que pertenecen al arreglo          *
+*****************************************************************
+        org     RAM
+arreglo rmb     EL_SIZE * N     ;reserva las posiciones necesarias para el arreglo
+
+        org     arreglo
+        fdb     1200,1235,44694,11920,50915,45   ;define los elementos del arreglo
+                                                 ;a comparar
+        END

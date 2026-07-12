@@ -1,0 +1,21 @@
+        p68h11          ;declara el microprocesador
+*****************************************************************
+*                        ÁREA DE ARREGLO                        *
+*     Se crea un arreglo de 6 elementos de un byte cada uno     *
+*****************************************************************
+RAM     equ     $2000
+N       equ     6       ;declara la cantidad de elementos del arreglo
+EL_SIZE equ     1       ;declara la cantidad de bytes de los elementos del arreglo
+
+
+
+*****************************************************************
+*                         ÁREA DE DATOS                         *
+*     Lista de los elementos que pertenecen al arreglo          *
+*****************************************************************
+        org     RAM
+arreglo rmb     EL_SIZE * N     ;reserva la posiciones de memorias del arreglo
+        org     arreglo
+        FCB     12,15,94,20,15,45   ;define los elementos del arreglo
+
+        END

@@ -1,0 +1,23 @@
+                p68h11          ;declaro el microprocesador a usar
+
+*****************************************************************
+* ÁREA DE ARRAY: Se crea un arreglo de 20 elementos de 26 bytes *
+* cada uno                                                      *
+*                                                               *
+*****************************************************************
+
+
+N               EQU     20              ;se declara el numero de libros
+                org     $0
+biblioteca      EQU     *               ;se creo la estructura biblioteca
+libro           EQU     *               ;se creo el elemento libro
+autor           rmb     20              ;se reserva 20 bytes para poner el autor
+ninvent         rmb     1               ;se reserva 1 byte para el numero de inventario
+tema            rmb     5               ;se reserva 5 bytes para el tema
+EL_SIZE         EQU     *-libro         ;declara la cantidad de bytes de los elementos
+                rmb     (-1+N)*EL_SIZE  ; del arreglo. Reservo el espacio para la
+
+                org     $2000           ; estructura completa
+fin             jmp     fin             ;termina el programa
+
+                END

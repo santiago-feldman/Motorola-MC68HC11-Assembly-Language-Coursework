@@ -1,0 +1,96 @@
+                p68h11                  ;declaro el microprocesador a usar
+
+
+*****************************************************************
+* ÁREA DE ARRAY: Se crea un arreglo de 20 elementos de 26 bytes *
+* cada uno                                                      *
+*                                                               *
+*****************************************************************
+
+
+N               EQU     20              ;se declara el numero de libros
+                org     $0
+biblioteca      EQU     *               ;se creo la estructura biblioteca
+libro           EQU     *               ;se creo el elemento libro
+autor           rmb     20              ;se reserva 20 bytes para poner el autor
+ninvent         rmb     1               ;se reserva 1 byte para el numero de inventario
+tema            rmb     5               ;se reserva 5 bytes para el tema
+EL_SIZE         EQU     *-libro         ;declara la cantidad de bytes de los
+                rmb     (-1+N)*EL_SIZE  ; elementos del arreglo, reservo el
+                                        ; espacio para la estructura completa
+
+*****************************************************************
+* MAIN PROGRAM : Aquí se va desarollar el programa principal que*
+*    llama a ka subrutinas                                      *
+*****************************************************************
+
+
+                org     $2000
+                lds     #stackp         ;necesario para el satck y subrutina
+                jsr     get_author      ;se realiza un llamado a la subrutina
+
+fin             jmp     fin             ;finaliza el programa
+*****************************************************************
+* SUBRUTINA GET_AUTHOR : recibe el número de invenatrio por AccA*
+* y devuelve un puntero al autor de libro por IX y la cantidad  *
+* de caracteres del nombre por AccA                             *
+*****************************************************************
+get_author      org     *
+
+                pshb                    ;hace backup de los registros
+                pshy
+
+                ldaa    #inv            ;se recibe el numero de inventario deseado,
+                ldx     #ninvent        ;debe ser definido previamente.Apunta el
+                ldy     #N              ; registro x al primer numero de
+                ldab    #EL_SIZE        ; inventario. Crea un contador de libros
+                                        ; buscados
+check           cmpa    0,x             ;chequea si coincide el numero de
+                beq     regauthor       ; inventario buscado con el leido. Si es
+                dey                     ; el mismo pasa a registrar el autor
+                bne     next            ;si no pasa al siguiente libro inventario
+                sec                     ; buscado ,si ya paso el ultimo libro y no encontró
+                rts                     ; lo buscado prende el carry
+next            abx                     ;pasa al siguiente libro
+                jmp     check
+
+regauthor       ldy     #ninvent-autor  ;se lleva el pointer al principio del
+point           dex                     ;nombre del autor
+                dey
+                bne     point
+
+                pshx                    ;se guarda esta ubicación porque el pointer va
+                clra                    ; a ser modficado ,crea el contador de caracteres
+
+authorname      ldab    0,x             ;lee el caracter
+                cmpb    #0              ;se fija que no sea 0
+                beq     namelength      ;si es 0 deja de leer
+                inca                    ;incrementa el contador de caracteres
+                inx
+                jmp     authorname      ;pasa al siguiente caracter
+
+namelength      pulx                    ;recupera la direccion de inicio del nombre
+                                        ; del autor
+                puly                    ;hace restore de los registros
+                pulb
+
+                rts                     ;vuelve al main program
+
+
+*****************************************************************
+* ÁREA DE VARIABLES: Donde se declaran las variables a usar     *
+*                                                               *
+*****************************************************************
+
+
+inv             EQU     2               ;el número de inventario deseado
+
+
+*****************************************************************
+* ÁREA DE STACK: se  reserva las posiciones del stack con un    *
+*    margen extra                                               *
+*****************************************************************
+                org     $3000
+stack           rmb     100
+stackp          EQU     *-1
+                END
