@@ -1,0 +1,12 @@
+        p68H11                  ;declara el microprocesador a usar
+        org     $3002
+        ldaa    #17             ;inicia contador de repeticiones
+        ldy     #$5000
+repito  ldab    0,y             ;tomo el valor de la memoria a sumar
+        abx
+        iny                     ;apunta a la siguiente posición de memoria a sumar
+        deca                    ;decrementa el contador
+        bne     repito          ;si el contador no es 0 repito
+        stx     $3000           ;si el contador es 0 guarda la solución
+fin     jmp     fin
+        END

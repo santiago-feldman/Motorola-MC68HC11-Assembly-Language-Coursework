@@ -1,0 +1,78 @@
+        p68h11                  ;Se declara el microprocesador
+
+*******************************************************************************************
+*                                      MAIN PROGRAM                                       *
+*     Éste programa se usa básicamente para poder contar del 0 al 15                      *
+*     de forma repetitiva encendiendo así los leds correspondientes a cada número.        *
+*******************************************************************************************
+
+        ORG     $4000
+
+inicio  ldaa    #APAGO          ;inicia un acumulador en 0
+
+        staa    $1000           ;carga el valor para mostrar apagados los leds del puerto A
+        jsr     delay
+        ldab    #15             ;inicia contador de números
+        stab    $4100           ;pasa el contador a una posición de memoria
+loop1   ldab    #on             ;toma el valor a sumar
+        aslb                    ;rota el valor un bit hacia la izquierda 3 veces
+        aslb                    ;de forma que así se pueda tener el valor de
+        aslb                    ;querido entre los bits 3-6
+        aba                     ;suma el valor anterior
+
+        jsr     delay
+        staa    $1000           ;guarda el valor en una posición de memoria
+        dec     $4100           ;decrementa el contador en 1
+        bne     loop1           ;si el contador no es 0,vuelve a repetir la secuencia
+        beq     inicio          ;si el contado es 0 repite el todo el programa
+fin     jmp     fin             ;termina el programa
+
+
+*******************************************************************************
+*     ÁREA DE DATOS: Aqui están los datos que se usan como variables          *
+*******************************************************************************
+
+on      EQU     1
+APAGO   EQU     00000000b
+
+
+*******************************************************************************
+*                            ÁREA DE LA SUBRUTINA:                            *
+*     Aquí desarrollamos la subrutina de forma que se genere                  *
+*     una espera de medio segundo entre el apagado y encendido de los leds    *
+*******************************************************************************
+
+delay   org     $3000
+        psha
+        pshb                    ;se hace un backup de los registros a modificar
+        pshx
+
+        ldx     #$0005          ;crea el contador mayor
+countl  dex
+        beq     endsrt1         ;si es cero el contador mayor va a terminar la subrutina
+
+        ldaa    #$FF            ;si no es cero reinicia el contador mediano
+countm  deca
+        beq     countl          ;si es cero el contador mediano pasa a decrementar el mayor
+
+        ldab    #$C3            ;si no es cero reinicia el contador menor
+counts  decb
+        bne     counts
+        jmp     countm          ;si es cero el contador menor decrementa el mediano
+
+endsrt1 pulx
+        pulb                    ;se recuperan los valores guardados
+        pula
+        rts
+*******************************************************************************************
+*                         ÁREA DEL STACK: se deja un margen extra                         *
+*******************************************************************************************
+        org     $8000
+stack   rmb     30
+stackP  EQU     * -1
+        lds     #stackP
+
+
+
+
+        end
