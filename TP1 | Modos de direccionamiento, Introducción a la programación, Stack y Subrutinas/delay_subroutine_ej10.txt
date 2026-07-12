@@ -1,0 +1,35 @@
+        p68h11
+
+        org     $2000
+        jsr     $3000
+fin     jmp     fin
+
+        org     $3000
+        psha
+        pshb                    ;se hace un backup de los registros a modificar
+        pshx
+
+        ldx     #$0005          ;crea el contador mayor
+countl  dex
+        beq     endsrt1         ;si es cero el contador mayor va a terminar el programa
+
+        ldaa    #$FF            ;si no es cero reinicia el contador mediano
+countm  deca
+        beq     countl          ;si es cero el contador mediano pasa a decrementar el mayor
+
+        ldab    #$C3            ;si no es cero reinicia el contador menor
+counts  decb
+        bne     counts
+        jmp     countm          ;si es cero el contador menor decrementa el mediano
+
+endsrt1 pulx
+        pulb                    ;se hace restore de los valores guardados
+        pula
+        rts
+
+        org     $8000
+stack   rmb     30
+stackP  EQU     *-1
+        lds     #stackP
+
+        END

@@ -1,0 +1,85 @@
+*****************************************************************
+*                          EJERCICIO 9                          *
+*     El programa se encarga de copiar un string menor o        *
+*     igual a 20 caracteres de una zona de memoria a otra       *
+*****************************************************************
+
+
+        p68h11                  ;declara el microprocesador
+
+
+*****************************************************************
+*                         MAIN PROGRAM                          *
+*     Llama a la subrutina strcpy para copiar la cadena de      *
+*     caracteres que se encuentran en la zona de origen  a      *
+*     en la zona de destino                                     *
+*****************************************************************
+
+        org     $4000
+main    equ     *
+        lds     #stackp         ;necesario para el stack y subrutina
+        ldx     #origen         ;carga la posición de memoria a leer
+        ldy     #destino        ;carga la posición de memoria en donde se copia
+        pshy                    ;hace backup de los registros y
+        pshx                    ;reserva posiciones de stack
+        jsr     strcpy          ;llama a la subrutina
+        pulx
+        puly                    ;hace restore de los registros
+fin     jmp     fin
+*****************************************************************
+*                       SUBRUTINA STRCPY                        *
+*     Debe recibir por stack la dirección del origen y          *
+*     destino y devuelve la copia del string                    *
+*                                                               *
+*****************************************************************
+
+
+        org     $4200
+strcpy  equ     *
+        pshb                    ;hace backup de los registros
+        tsx                     ;crea frame pointer
+        ldy     5,x             ;toma el valor de destino
+        ldx     3,x             ;toma el valor de origen
+        ldab    #20             ;inicia contador de caracteres
+repito  ldaa    0,x             ;lee el carácter la posición de memoria de origen
+        staa    0,y             ;copia el carácter en la posición de memoria de destino
+        beq     termino         ;si el carácter es 0 entonces termina de leer y copiar
+        inx                     ;pasa a la siguiente posición de memoria de origen
+        iny                     ;pasa a la siguiente posición de memoria de destino
+        decb                    ;decrementa el contador de caracteres
+        bne     repito          ;si el contador no es 0 repite el proceso
+        sec                     ;si el contador es 0, la copia no fue exitosa
+        jmp     fins
+termino clc     #0              ;la copia fue exitosa porque se encontro el fin del string
+        pulb                    ;hace restore de los registro
+fins    rts                     ;termina la subrutina
+
+
+*****************************************************************
+*                         AREA DE DATOS                         *
+*     Lista de los caracteres ASCII que se van a copiar         *
+*     y el comienzo del origen y destino y cantidad máxima de   *
+*     caracteres que se pueden copiar                           *
+*****************************************************************
+
+
+origen  equ     $3000           ;define el comienzo de donde se va a leer el string
+destino equ     $3100           ;define el comienzo de donde se va a copiar el string
+        org     destino
+        rmb     20              ;define la cantidad máxima de caracteres que puede copiar
+        org     origen
+        fcc     'introduccion a la computacion' ;cadena de caracteres que se quiere copiar
+        fcb     $00             ;define la terminación del string
+
+
+*****************************************************************
+*                         AREA DE STACK                         *
+*     Se necesitan 5 posiciones, se deja un margen extra        *
+*****************************************************************
+
+        org     $4500
+stack   rmb     20
+stackp  equ     *-1
+
+
+        END
