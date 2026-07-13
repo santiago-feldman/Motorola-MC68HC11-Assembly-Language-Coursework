@@ -1,0 +1,144 @@
+        p68h11
+
+
+
+
+        public   EL_SIZE,AR_SIZE,MAPA1,MAPA2,ran
+        extern   flagmap,MAP1,MAP2,MAP3,MAP4,MAP5,MAP6,MAP7
+
+FIL     EQU      6                  ;es el valor de las columnas
+COL     EQU      6                  ;es el valor de las filas
+EL_SIZE EQU      1
+AR_SIZE EQU      EL_SIZE*COL
+VALOR   EQU      17                 ;es una constante usada para usos diversos
+FIJOP   EQU      6                  ;valor usado para contadores
+COLUM   EQU      5                  ;
+COUNTW EQU       36                 ;contador de espacios de cada matriz
+COUNT   EQU      2                  ;valor usado para contador de suboperaciones
+REFER   EQU      0                  ;valor usado para las referencias de la matriz
+OP1     EQU      1                  ;aqui se colocan como constantes los
+OP2     EQU      2                  ;valores numéricos de cada tecla usados para
+OP3     EQU      3                  ;seleccionar los pares de mapas ya elegidos
+OP4     EQU      4
+OP5     EQU      5                  ;previamente con el teclado
+OP6     EQU      6
+OP7     EQU      7
+
+        MACRO    %FIJO
+
+        ldaa     flagmap            ;se lee el flag en el cual se guarda un valor dependiendo
+        ldab     #\0                ;de la tecla que se pulsó y tomamos el valor de cada operacion
+        sba                         ;y se compara con el flag para ver si es una operacion a realizar
+
+        ENDMAC
+
+        MACRO    %PX
+
+        ldab     #COUNTW            ;inicia un contador para la primer matriz del jugador P1
+        stab     Conter
+        ldx      #\0                ;nos paramos en la matriz a usar
+lopi1\@ ldaa     0,y                ;se comienza en la primer posicion del mapa ya pre hecho
+        iny                         ;avanzamos un espacio para luego copiar otro elemento
+        staa     0,x                ;se escribe ese lugar del mapa y se va
+        inx                         ;copiando asi cada lugar en
+        dec      Conter             ;ambos mapas para los 2 jugadores
+        beq      ini2\.             ;si se terminó el contador va a la otra operacion
+        jmp      lopi1\.            ;y sino sigue colocando los elementos
+ini2\.  ldab      #COUNTW            ;comienza el conteo para el jugador numero 2
+        stab      Conter             ;se vuelve a cargar el contador
+        ldx       #\1                ;no paramos en el mapa del jugador 2
+lopi2\. ldaa      0,y                ;y comienzan a cargarse los elementos
+        iny
+        staa      0,x                ;hasta que termine el contador y termine la
+        inx                          ;operacion de llenado
+        dec       Conter
+        bne       lopi2\.
+        ENDMAC
+
+          rseg    SUBR
+ran       ldab    #COUNT             ;se inicia el contador para poder comenzar el programa
+          stab    dific
+M1Ref     ldx     #M1                ;nos paramos en la primera parte de la referencia
+LoopR     ldab    #FIJOP             ;incio el contador para colocar los 0
+          stab    countr
+LoopRe    ldaa    #REFER
+          staa    0,x                ;se llena los espacios de referenciado
+          inx
+          dec     countr
+          beq     M2Ref              ;si el contador llega a 0 se llena el otro espacio
+          bne     LoopRe             ;sino vuelve a su espacio inicial
+M2Ref     dec     dific              ;se ve si no va al tercer referenciado,
+          beq     MF1Ref
+          ldx     #M2                ;comienza el segundo referenciado llenado de ceros
+          ldab    #FIJOP             ;los 6 espacios en el medio de los 2 mapas (jugador
+          stab    countr             ;1 y jugador 2)
+          jmp     LoopRe
+
+MF1Ref    ldx     #MF1               ;se posiciona en las ultimas referencias de ceros
+          ldab    #FIJOP             ;se carga el valor del contador
+          stab    countr
+Loop2R    ldaa    #REFER
+          staa    0,x
+          inx                        ;comienza el llenado de ceros hasta terminar
+          dec     countr             ; e ir a la lectura de flag de la tecla
+          beq     start
+          jmp     Loop2R
+
+
+
+start     ldaa    flagmap            ;se lee el flag de la tecla seleccionada y
+
+opera     %FIJO   1                  ;dependiendo de qué tecla de presionó va a hacer
+          bne     opera2             ;un llenado de embarcaciones diferentes
+
+          ldy     #MAP1              ;ve si es el mapa correspondiente en cada caso, ya sea 1,2..
+          %PX     MAPA1,MAPA2        ; en el caso de que sea alguna opcion
+          jmp     Termi              ;realiza una operacion que consiste en   llenar el Mapa del P1
+opera2    %FIJO   2                  ;y luego el Mapa del P2
+          bne     opera3             ;logrando así una configuracion distinta paracada jugador
+
+          ldy     #MAP2
+          %PX     MAPA1,MAPA2
+          jmp     Termi
+
+opera3    %FIJO   3
+          bne     opera4
+
+          ldy     #MAP3
+         %PX      MAPA1,MAPA2
+         jmp      Termi
+
+opera4   %FIJO    4
+         bne      opera5
+
+         ldy      #MAP4
+         %PX      MAPA1,MAPA2
+         jmp      Termi
+
+opera5   %FIJO    5
+         bne      opera6
+
+         ldy      #MAP5
+         %PX      MAPA1,MAPA2
+         jmp      Termi
+
+opera6   %FIJO    6
+         bne      Termi
+
+         ldy      #MAP6
+         %PX      MAPA1,MAPA2
+         jmp      Termi
+
+Termi    rts                         ;termina y comienza la partida
+
+         rseg     CONST
+M1       rmb      6                  ;aqui estan los 6 espacios para referencia inicial
+MAPA1    rmb      36                 ;aqui está el mapa del P1
+MF1      rmb      6                  ;segundo espacio de referencia
+MAPA2    rmb      36                 ;aquí esta el mapa del P2
+M2       rmb      6                  ;tercer espacio de referencia
+countr   rmb      1
+Conter   rmb      1
+dific    rmb      1
+
+         END

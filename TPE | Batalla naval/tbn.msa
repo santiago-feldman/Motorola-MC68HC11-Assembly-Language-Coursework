@@ -1,0 +1,791 @@
+                p68h11
+
+
+
+
+                extern dofire,loop1,wins,ran
+                public flagp,winp1,winp2,flagmap,MAP1,MAP2,MAP3,MAP4,MAP5,MAP6,MAP7,AGUA,BARC,CARG
+
+****************************************
+*             AREA DE EQUs             *
+*                                      *
+* Se definen labels que se utilizaran  *
+*            en el programa            *
+*                                      *
+****************************************
+
+$display3.def
+******************************Ports************************************
+
+DDRC            equ      $1007              ;data direction register for C
+PIOC            equ      $1002              ;for strobe B assertion change
+PORTCL          equ      $1005              ;port C latched
+PORTB           equ      $1004              ;port B
+PORTC           EQU      $1003              ;rows
+
+***********************Cols and Row Ports*****************************
+
+ROWS            EQU      PORTC              ;outputs
+COLS            EQU      PORTCL             ;inputs
+
+****************************Row Masks*********************************
+
+FIL0            EQU      00001110b          ;mascaras para manejo de filas
+FIL1            EQU      00001101b
+FIL2            EQU      00001011b
+FIL3            EQU      00000111b
+
+**************************Keyboard Mask*******************************
+
+MASKA           EQU      11101110b
+MASKB           EQU      11011110b
+MASKC           EQU      10111110b
+MASKD           EQU      11101101b
+MASKE           EQU      11011101b
+MASKF           EQU      10111101b
+
+MASK1           EQU      11101011b
+MASK2           EQU      11011011b
+MASK3           EQU      10111011b
+MASK4           EQU      11100111b
+MASK5           EQU      11010111b
+MASK6           EQU      10110111b
+
+MASKP1          EQU      01111110b
+MASKP2          EQU      01111101b
+MASKFR          EQU      01111011b
+MASKR           EQU      01110111b
+
+*****************************Display**********************************
+
+DI_START        EQU      $03
+DI_END          EQU      $00
+
+
+L               EQU      $9
+M               EQU      $FF
+S               EQU      $FF
+
+
+AGUA            EQU      00000011b          ;valor del color azul y agua
+BARC            EQU      01000011b          ;valor del submarino
+CARG            EQU      10000011b          ;valor del carguero
+
+
+
+****************************************
+*             AREA DE MACROS           *
+*                                      *
+*     Aqui se definen las macros que   *
+*      seran utilizadas a lo largo     *
+*              del programa            *
+*                                      *
+****************************************
+
+                MACRO    %LETRA
+
+                ldaa     flagmsel           ;se fija si ya se eligieron mapas
+                beq      setmap\@           ;si no se eligieron lo elige
+                ldaa     #\0                ;si
+                jsr      chklet             ;se fija se toca seleccionar letra
+                jsr      muestro            ;si toca la muestra en el display
+                ldaa     #\1                ;y guarda en el stack la coordenada
+                psha
+                jmp      barrido            ;vuelve a barrer
+
+setmap\<        inc      flagmsel
+                ldaa     #\2
+                staa     flagmap            ;guarda el mapa seleccionado
+                ldab     #$30
+                aba
+                ldab     #DI_END
+                jsr      outchar
+                jsr      ran                ;lo imprime en memoria
+                jmp      barrido            ;vuelve a barrer
+
+                ENDMAC
+
+
+                  MACRO    %NUMERO
+
+                  ldab     counter
+                  cmpb     #1                 ;se fija si toca seleccionar numero
+                  bne      \0                 ;si no toca sigue barriendo
+                  ldaa     #\1                ;si toca guarda la coordenada en el stack
+                  psha
+                  ldaa     #\2                ;y muestra el numero en el display
+                  jsr      muestro
+                  jmp      barrido            ;vuelve a barrer
+
+                  ENDMAC
+
+
+
+****************************************
+*             MAIN PROGRAM             *
+*                                      *
+* Este programa tiene como objetivo    *
+*    replicar el funcionamiento del    *
+*      juego de mesa BATALLA NAVAL     *
+*                                      *
+****************************************
+
+                  rseg     CODE
+
+                  jsr      initdis            ;se inicializa el display
+
+Reset             lds      #stackP
+                  ldaa     #6
+                  staa     winp1              ;se reinician los contadores de victoria
+                  staa     winp2
+                  clr      flagmsel           ;se reinicia el indicador de seleccion de mapa
+
+                  jsr      selec
+
+vas               ldab     #DI_START          ;toma el valor de la primera posición del display
+                  ldx      #4                 ;inicia contador de posiciones del display
+                  ldaa     #0                 ;toma el valor 0 para borrar el display
+cleandisp         jsr      outchar            ;imprime
+                  decb                        ;decrementa la posición del display
+                  dex                         ;decrementa el contador de posiciones
+                  bne      cleandisp          ;si el contador no es 0 repite la secuencia
+
+                  ldaa     #0                ;se inicia el flag de jugador en 0 para que cualquiera
+                  staa     flagp              ;pueda jugar primero
+
+primedisp         ldab     #2
+                  stab     counter           ;se preparan las posiciones de memoria que funcionan
+                  ldaa     #0                 ;como contador y como retenedor de caracteres
+                  staa     msg+1
+
+
+
+****************************************
+*          SECCION DE TECLADO          *
+*                                      *
+* Esta parte del programa se encarga   *
+* de leer constantemente los valores   *
+* del Puerto C para fijarse si alguna  *
+* tecla es presionada, registrar esa   *
+*     tecla y realizar las acciones    *
+*     necesarias para el desarrollo    *
+*             de la partida            *
+*                                      *
+****************************************
+
+barrido           ldaa     winp1
+                  beq      vic                ;se fija si gano algun jugador
+                  ldaa     winp2              ;y si es asi lo muestra
+                  beq      vic
+                  bra      barrido0
+
+vic               jsr      victoria
+                  jsr      wins
+
+barrido0        jsr     delay           ;se genera un poco de retraso en el barrido para
+****************************************;evitar presionar involuntariamente la misma tecla
+****************************************;mas de una vez
+                ldab    #FIL0
+                stab    PORTC           ;se prepara la mascara de la fila 0
+
+****************************************;SE PRESIONA EL BOTON
+
+                  ldaa     PORTC
+                  cmpa     #MASKA
+                  beq      writeA
+                  cmpa     #MASKB
+                  beq      writeB             ;se compara el valor del puerto c con los valores
+                  cmpa     #MASKC             ;correspondientes a cada tecla de la fila 0 para
+                  beq      writeC             ;detectar si se presiono una tecla
+                  cmpa     #MASKP1
+                  beq      writeP1
+                  jmp      barrido1
+
+
+writeA            %LETRA   $11,0,1
+
+writeB            %LETRA   $12,1,2
+
+writeC            %LETRA   $13,2,3
+
+writeP1           jmp      P1
+
+
+barrido1          ldab     #FIL1
+                  stab     PORTC              ;se prepara la mascara de la fila 1
+
+****************************************;SE PRESIONA EL BOTON
+
+                  ldaa     PORTC
+                  cmpa     #MASKD
+                  beq      writeD
+                  cmpa     #MASKE
+                beq      writeE             ;se compara el valor del puerto c con los valores
+                cmpa     #MASKF             ;correspondientes a cada tecla de la fila 1 para
+                beq      writeF             ;detectar si se presiono una tecla
+                cmpa     #MASKP2
+                beq      writeP2
+                jmp      barrido2
+
+writeP2         jmp      P2
+
+writeD          %LETRA   $14,3,4
+
+writeE          %LETRA   $15,4,5
+
+writeF          %LETRA   $16,5,6
+
+
+chklet          ldab     counter
+                cmpb     #2                 ;se fija si toca seleccionar letra
+                bne      notocal            ;si no toca vuelve a barrer
+                rts
+
+notocal         pula                        ;se acomoda el stack
+                pula
+                bra      barrido2           ;vuelve a barrer
+
+
+
+
+
+barrido2        ldab     #FIL2
+                stab     PORTC              ;se prepara la mascara de la fila 2
+
+****************************************;SE PRESIONA EL BOTON
+
+                ldaa     PORTC
+                cmpa     #MASK1
+                beq      write1
+                cmpa     #MASK2
+                beq      write2             ;se compara el valor del puerto c con los valores
+                cmpa     #MASK3             ;correspondientes a cada tecla de la fila 2 para
+                beq      write3             ;detectar si se presiono una tecla
+                cmpa     #MASKFR
+                beq      writeFire
+                jmp      barrido3
+
+
+write1          %NUMERO barrido3,0,1
+
+write2          %NUMERO barrido3,1,2
+
+write3          %NUMERO barrido3,2,3
+
+writeFire       ldaa     counter            ;si no toca disparar no dispara
+                bne      barrido3
+                jsr      dofire
+                jmp      primedisp          ;se prepara para recibir otra coordenada
+
+
+barrido3        ldab     #FIL3
+                stab     PORTC              ;se prepara la mascara de la fila 3
+
+****************************************;SE PRESIONA EL BOTON
+
+                  ldaa     PORTC
+                  cmpa     #MASK4
+                  beq      write4
+                  cmpa     #MASK5
+                  beq      write5             ;se compara el valor del puerto c con los valores
+                  cmpa     #MASK6             ;correspondientes a cada tecla de la fila 3 para
+                  beq      write6             ;detectar si se presiono una tecla
+                  cmpa     #MASKR
+                  beq      writeReset
+                  jmp      barrido
+
+
+write4            %NUMERO barremos,3,4
+
+write5            %NUMERO barremos,4,5
+
+write6            %NUMERO barremos,5,6
+
+writeReset        ldaa     #6
+                  staa     winp1              ;reinicia los counters de condicion de victoria
+                  staa     winp2
+                  jmp      Reset              ;reinicia
+
+
+barremos          jmp      barrido            ;vuelve a barrer
+
+
+muestro           cmpb     #1
+                  beq      seg                ;si es el numero lo guarda en la segunda celda
+                  staa     celda1             ;si es la letra la guarda en la primera celda
+                  bra      mues
+seg               staa     celda2
+mues              jsr      show               ;muestra lo seleccionado hasta el momento
+                  rts
+
+
+P1                ldaa     flagp
+                  cmpa     #1                 ;si todavia esta jugando el P1 vuelve a barrer
+                  beq      yej
+                  ldaa     counter
+                  cmpa     #2                ;si esta jugando el P2 indica a traves del display que
+                  bne      noturno            ;no es su turno
+                  ldaa     #1
+                  staa     flagp              ;si le toca al P1 se indica que esta jugando
+                  bra      prntpl             ;y se muestra en el display
+
+
+P2                ldaa     flagp
+                  cmpa     #2                 ;si todavia esta jugando el P2 vuelve a barrer
+                  beq      yej
+                  ldaa     counter
+                  cmpa     #2                ;si esta jugando el P1 indica a traves del display que
+                  bne      noturno            ;no es su turno
+                  ldaa     #2
+                  staa     flagp              ;si le toca al P2 se indica que esta jugando
+                  bra      prntpl             ;y se muestra en el display
+
+yej               ldaa     counter
+                  beq      ye2
+                  cmpa     #1                ;Caso de uso: si un jugador ya tiene el turno y vuelve
+                  bne      yen               ;a apretar Player 1 o Player 2, se repite la operación
+                  pula                        ;de selección de jugador, lo que no tiene otras
+                  jmp      vas                ;consecuencias que “borrar” una entrada parcial de
+ye2               pula                        ;coordenadas antes de apretar “disparo.
+                  pula
+yen               jmp      vas
+
+
+prntpl            ldab     #$30
+                  aba
+                  ldab     #DI_END
+                  jsr      outchar            ;se imprime el numero de jugador
+                  incb
+                  ldaa     #$50
+                  jsr      outchar            ;se imprime la P
+                  jsr      loop1
+                  jmp      primedisp          ;reinicia el counter, prepara msg y vuelve a barrer
+
+
+noturno           jsr      espere             ;si no es el turno, lo indica en el display
+                  ldaa     counter            ;se fija si ya había seleccionado el numero
+                  beq      nt2num             ;si es asi muestra los dos caracteres
+                  inc      counter
+                  ldaa     #0                 ;si no muestra solo la letra
+                  staa     celda2
+nt2num            jsr      show
+                  jmp      barrido            ;vuelve a barrer
+
+
+
+****************************************
+*         SECCION DE SUBRUTINAS        *
+*                                      *
+*   Aquí se encuantran las subrutinas  *
+*    de delay, de inicializacion del   *
+* display y de envio de caracteres al  *
+*               display                *
+*                                      *
+****************************************
+
+****************************************
+*           SUBRUTINA INITDIS          *
+*                                      *
+*           Inicia el display          *
+*                                      *
+****************************************
+
+                  rseg     SUBR
+
+initdis           EQU      *
+
+                  psha
+
+                  ldaa     #$0F
+                  staa     DDRC
+                  ldaa     PIOC               ;se prepara el display
+                  anda     #$FE
+                  staa     PIOC
+
+                  pula
+                rts
+
+
+
+****************************************
+*          SUBRUTINA OUTCHAR           *
+*                                      *
+*      Envia caracteres al display     *
+*                                      *
+****************************************
+
+outchar         rseg     SUBR
+
+                stab     PORTCL             ;se envian los caracteres
+                staa     PORTB
+
+                rts
+
+
+
+****************************************
+*           SUBRUTINA DELAY            *
+*                                      *
+*          Produce una demora          *
+*                                      *
+****************************************
+
+delay           rseg     SUBR
+
+                org      *
+                psha
+                pshb                        ;se hace un backup de los registros a modificar
+                pshx
+
+                ldx      #L                 ;crea el contador mayor
+countl          dex
+                beq      endelay           ;si es cero el contador mayor va a terminar el programa
+
+                ldaa     #M                 ;si no es cero reinicia el contador mediano
+countm          deca
+                beq      countl            ;si es cero el contador mediano, decrementará el mayor
+
+                ldab     #S                 ;si no es cero reinicia el contador menor
+counts          decb
+                bne      counts
+                jmp      countm             ;si es cero el contador menor decrementa el mediano
+
+endelay         pulx
+                pulb                        ;se recuperan los valores guardados
+                pula
+                rts
+
+
+
+****************************************
+*             SUBRUTINA SHOW           *
+*                                      *
+*    Acomoda los caracteres para ser   *
+*          enviados al display         *
+*                                      *
+****************************************
+
+                rseg     SUBR
+
+show            ldab     #DI_END            ;toma el valor de la primera posición del display
+                ldx      #4                 ;inicia contador de posiciones del display
+                ldaa     #0                 ;toma el valor 0 para borrar el display
+cleanshow       jsr      outchar            ;llama a la subrutina para poner los valores del display
+                incb                        ;decrementa la posición del display
+                dex                         ;decrementa el contador de posiciones
+                bne      cleanshow          ;si el contador no es 0 repite la secuencia
+
+                ldy      #msg               ;se apunta IY a donde se guardaran los caracteres
+
+
+                ldaa     celda1             ;se carga a con el ultimo digito tecleado
+                ldab     #$30               ;se lo convierte a ASCII
+                aba
+                staa     0,y                ;se retiene al caracter en una posicion de memoria
+                dec      counter            ;se actualiza la cantidad de digitos ingresados
+                bne      undigit            ;si el numero es de un digito pasa a imprimirlo
+
+                ldaa     celda2             ;si no carga el otro digito
+                ldab     #$30               ;se lo convierte a ASCII
+                aba
+                staa     1,y                ;se retiene el caracter
+
+undigit         ldab     #DI_END+1
+
+dosdig          ldaa     0,y
+                beq      endshow            ;se imprime el numero entero hasta ahora, ya sea
+                jsr      outchar            ;de una o dos cifras
+                decb
+                iny
+                bra      dosdig
+endshow         rts                         ;vuelve a barrer
+
+
+
+****************************************
+*           SUBRUTINA ESPERE           *
+*                                      *
+*    Le indica al jugador que no es    *
+*               su turno               *
+*                                      *
+****************************************
+
+espere          rseg     SUBR
+
+                ldab     #DI_START          ;toma el valor de la primera posición del display
+                ldx      #4                 ;inicia contador de posiciones del display
+loopes          ldaa     #0                 ;toma el valor 0 para borrar el display
+                jsr      outchar            ;llama a la subrutina para mandar al display
+                  decb                        ;decrementa la posición del display
+                  dex                         ;decrementa el contador de posiciones
+                  bne      loopes             ;si el contador no es 0 repite la secuencia
+
+                  ldy      #long              ;inicia contador de longitud de la frase
+                  ldx      #msge              ;apunta al primer caracter
+repeat            jsr      espere1            ;salta a la subrutina adecuada
+                  jsr      delay              ;llama a la subrutina que genera el delay
+                  inx                         ;incrementa el puntero de los caracteres
+                  dey                         ;decrementa el contador
+                  bne      repeat             ;si el contador no es 0, sigo imprimiendo
+                  rts                         ;si el contador es 0, termino
+
+espere1           rseg     SUBR
+
+                  pshx
+                  pshy
+                  ldy      #4                 ;inicia contador de caracteres a mostrar
+                  ldab     #DI_START          ;toma el valor de la última posición del display
+loopes2           ldaa     0,x                ;toma el un caracter de la frase
+                  jsr      outchar            ;llama a la subrutina para mandar al display
+                  dey                         ;decrementa contador de caracteres
+                  beq      ter                ;si el contador es 0, termina la subrutina
+                  inx                        ;si no es 0, incrementa el puntero de los caracteres
+                  decb                        ;decrementa la posición del display
+                  jmp      loopes2            ;vuelve a repetir la secuencia
+
+ter               puly
+                  pulx
+                  rts                         ;retorna de la subrutina
+
+
+
+****************************************
+*          SUBRUTINA VICTORIA          *
+*                                      *
+*    Le indica al jugador que no es    *
+*               su turno               *
+*                                      *
+****************************************
+
+victoria          rseg     SUBR
+
+                  ldab     #DI_START          ;toma el valor de la primera posición del display
+                  ldx      #4                 ;inicia contador de posiciones del display
+lopes             ldaa     #0                 ;toma el valor 0 para borrar el display
+                  jsr      outchar            ;llama a la subrutina para mandar al display
+                  decb                        ;decrementa la posición del display
+                  dex                         ;decrementa el contador de posiciones
+                  bne      lopes              ;si el contador no es 0 repite la secuencia
+
+                  ldy     #lng                ;inicia contador de longitud de la frase
+                  ldx     #mge                ;apunta al primer caracter
+rpeat             jsr     victoria1           ;salta a la subrutina adecuada
+                  jsr     delay               ;llama a la subrutina que genera el delay
+                  inx                         ;incrementa el puntero de los caracteres
+                  dey                         ;decrementa el contador
+                  bne      rpeat              ;si el contador no es 0, sigo imprimiendo
+                  rts                         ;si el contador es 0, termino
+
+victoria1         rseg     SUBR
+
+                 pshx
+                 pshy
+                 ldy      #4                 ;inicia contador de caracteres a mostrar
+                 ldab     #DI_START          ;toma el valor de la última posición del display
+lopes2           ldaa     0,x                ;toma el un caracter de la frase
+                 jsr      outchar            ;llama a la subrutina para mandar al display
+                 dey                         ;decrementa contador de caracteres
+                 beq      te                 ;si el contador es 0, termina la subrutina
+                 inx                        ;si no es 0, incrementa el puntero de los caracteres
+                 decb                        ;decrementa la posición del display
+                 jmp      lopes2             ;vuelve a repetir la secuencia
+
+te               puly
+                 pulx
+                 rts                         ;retorna de la subrutina
+
+
+
+****************************************
+*           SUBRUTINA SELEC            *
+*                                      *
+* Le indica al jugador que seleccione  *
+*                mapas                 *
+*                                      *
+****************************************
+
+selec            rseg     SUBR
+
+                 ldab     #DI_START          ;toma el valor de la primera posición del display
+                 ldx      #4                 ;inicia contador de posiciones del display
+loopess          ldaa     #0                 ;toma el valor 0 para borrar el display
+                 jsr      outchar            ;llama a la subrutina para mandar al display
+                 decb                        ;decrementa la posición del display
+                 dex                         ;decrementa el contador de posiciones
+                 bne      loopess            ;si el contador no es 0 repite la secuencia
+
+                 ldy      #lg                ;inicia contador de longitud de la frase
+                 ldx      #mg                ;apunta al primer caracter
+repeatt          jsr      selec1             ;salta a la subrutina adecuada
+                 jsr      delay              ;llama a la subrutina que genera el delay
+                 inx                         ;incrementa el puntero de los caracteres
+                 dey                         ;decrementa el contador
+                 bne      repeatt            ;si el contador no es 0, sigo imprimiendo
+                 rts                         ;si el contador es 0, termino
+
+selec1           rseg     SUBR
+
+                 pshx
+                 pshy
+                 ldy      #4                 ;inicia contador de caracteres a mostrar
+                 ldab     #DI_START          ;toma el valor de la última posición del display
+loopess2         ldaa     0,x                ;toma el un caracter de la frase
+                 jsr      outchar            ;llama a la subrutina para mandar al display
+                 dey                         ;decrementa contador de caracteres
+                 beq      tr                 ;si el contador es 0, termina la subrutina
+                 inx                        ;si no es 0, incrementa el puntero de los caracteres
+                 decb                        ;decrementa la posición del display
+                 jmp      loopess2           ;vuelve a repetir la secuencia
+
+tr               puly
+                  pulx
+                  rts                         ;retorna de la subrutina
+
+
+
+****************************************
+*          AREA DE VARIABLES           *
+*                                      *
+*   Aqui se guardan las posiciones de  *
+*     memoria que seran usadas como    *
+*               variables              *
+*                                      *
+****************************************
+
+                  rseg     VARS
+
+counter           rmb      1                  ;este contador se guarda la cantidad de caracteres
+
+                  fcb      0
+msg               rmb      2                  ;esto se usa para retener los caracteres ASCII
+                  fcb      0
+
+celda1            rmb      1                  ;estas posiciones se usan para retener las celdas
+celda2            rmb      1                  ;seleccionadas por los jugadores
+
+flagp             rmb      1                  ;este flag indica que jugador esta en turno
+
+winp1             rmb      1                  ;indican cuanto falta para que gane cada jugador
+winp2             rmb      1
+
+flagmsel          rmb      1                  ;se usan para la seleccion de mapas
+flagmap           rmb      1
+
+
+
+****************************************
+*          AREA DE CONSTANTES          *
+*                                      *
+*   Aqui se guardan las posiciones de  *
+*     memoria que seran usadas como    *
+*               variables              *
+*                                      *
+****************************************
+
+                  rseg     CONST
+
+                  fcb      0
+msge              fcb      0               ;necesarios para el comienzo de la muestra de la frase
+                  fcb      0
+                  fcb      0
+                  fcc      'ESPERE SU TURNO';define la frase que se quiere mostrar
+                  fcb      0                  ;terminador
+                  fcb      0                  ;necesarios para el final de la muestra de la frase
+                  fcb      0
+                  fcb      0
+long              equ      *-msge             ;define la longitud de la frase con más parámetros
+
+
+                  fcb      0
+mge               fcb      0                 ;necesarios para el comienzo de la muestra de la frase
+                  fcb      0
+                  fcb      0
+                  fcc      'VICTORIA'         ;define la frase que se quiere mostrar
+                  fcb      0                  ;terminador
+                  fcb      0                  ;necesarios para el final de la muestra de la frase
+                  fcb      0
+                  fcb      0
+lng               equ      *-mge              ;define la longitud de la frase con más parámetros
+
+                  fcb      0
+mg                fcb      0               ;necesarios para el comienzo de la muestra de la frase
+                  fcb      0
+                  fcb      0
+                  fcc      'SELECCIONE MAPA';define la frase que se quiere mostrar
+                  fcb      0                  ;terminador
+                  fcb      0                  ;necesarios para el final de la muestra de la frase
+                  fcb      0
+                  fcb      0
+lg                equ      *-mg               ;define la longitud de la frase con más parámetros
+
+
+                  rseg     CONST
+
+MAP1              fcb      AGUA,AGUA,AGUA,CARG,AGUA,CARG
+                  fcb      AGUA,AGUA,AGUA,CARG,AGUA,CARG
+                  fcb      AGUA,BARC,AGUA,AGUA,AGUA,AGUA
+                  fcb      AGUA,CARG,CARG,AGUA,AGUA,BARC
+                  fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+                  fcb      AGUA,BARC,AGUA,AGUA,AGUA,AGUA
+
+MAP2              fcb      CARG,AGUA,AGUA,AGUA,CARG,CARG
+                  fcb      CARG,AGUA,AGUA,BARC,AGUA,AGUA
+                  fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+                  fcb      BARC,AGUA,AGUA,AGUA,BARC,AGUA
+                  fcb      AGUA,AGUA,CARG,CARG,AGUA,AGUA
+                  fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+
+MAP3              fcb      AGUA,AGUA,AGUA,BARC,AGUA,AGUA
+                  fcb      CARG,CARG,AGUA,AGUA,AGUA,AGUA
+                  fcb      AGUA,AGUA,CARG,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,CARG,AGUA,CARG,CARG
+               fcb      AGUA,BARC,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,AGUA,BARC,AGUA,AGUA
+
+MAP4           fcb      BARC,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,BARC,AGUA,AGUA,BARC
+               fcb      AGUA,CARG,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,CARG,AGUA,CARG,CARG,AGUA
+               fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,CARG,CARG,AGUA,AGUA,AGUA
+
+MAP5           fcb      AGUA,CARG,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,CARG,AGUA,CARG,CARG,AGUA
+               fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,AGUA,AGUA,AGUA,BARC
+               fcb      BARC,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,BARC,AGUA,CARG,CARG
+
+MAP6           fcb      AGUA,AGUA,AGUA,AGUA,BARC,AGUA
+               fcb      BARC,AGUA,CARG,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,CARG,AGUA,AGUA,CARG
+               fcb      AGUA,AGUA,AGUA,AGUA,AGUA,CARG
+               fcb      CARG,AGUA,AGUA,BARC,AGUA,AGUA
+               fcb      CARG,AGUA,AGUA,AGUA,AGUA,AGUA
+
+MAP7           fcb      CARG,CARG,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,CARG,CARG,AGUA,BARC
+               fcb      BARC,AGUA,AGUA,AGUA,AGUA,AGUA
+               fcb      AGUA,AGUA,CARG,CARG,AGUA,AGUA
+               fcb      AGUA,AGUA,AGUA,AGUA,BARC,AGUA
+
+
+
+****************************************
+*            AREA DEL STACK            *
+*                                      *
+*   Aqui se guardan las posiciones de  *
+*     memoria que seran usadas como    *
+*                stack                 *
+*                                      *
+****************************************
+
+                  rseg      STACK
+
+stack             rmb       100
+stackP            EQU       *-1
+
+
+
+                  END

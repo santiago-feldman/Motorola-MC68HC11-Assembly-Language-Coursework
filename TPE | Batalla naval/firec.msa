@@ -1,0 +1,289 @@
+         p68h11
+
+
+
+
+         extern   flagp,winp1,winp2,EL_SIZE,AR_SIZE,MAPA1,MAPA2,AGUA,BARC,CARG
+         public   dofire,loop1,BM
+
+
+****************************************
+*             AREA DE MACROS           *
+*                                      *
+*     Aqui se definen las macros que   *
+*      seran utilizadas a lo largo     *
+*              del programa            *
+*                                      *
+****************************************
+
+         MACRO    %IMPR               ;macro que se encacarga de imprimir la matriz en el bitmap
+
+        ldaa      #\0                 ;inicia contador de cantidad de casillas
+again\@ ldab      0,x                 ;toma una casilla de la matriz
+        stab      0,y                 ;toma una posición del bitmap
+        inx                           ;apunta a la casilla siguiente
+         iny                         ;apunta a la posición del bitmap siguiente
+         deca                        ;decrementa el contador de casillas
+         bne      again\<            ;si el contador no es cero, repite el proceso
+         ENDMAC
+
+         MACRO    %ANALI             ;analiza los que pasa en las posiciones alrededor del carguero
+         ldy      guardo             ;toma la posición de la casilla
+         ldab     #\0                ;toma el valor absoluto de desplazamiento
+         aby                         ;le suma el desplazamiento
+         ldab     0,y                ;analiza si la casilla tiene un carguero hundido
+         ENDMAC
+
+         MACRO    %ANALI2            ;analiza los que sucede en las posiciones alrededor del carguero
+         ldab     #\0                ;inicia contador de posiciones a moverse hacia atrás
+         ldy      guardo             ;toma la posición de la casilla
+repe\@   dey                         ;el puntero apunta a una posición anterior
+         decb                        ;decrecementa el contador
+         bne      repe\<             ;si el contador no es cero, repite el proceso
+         ldab     0,y                ;analiza si la casilla tiene un carguero hundido
+         ENDMAC
+
+
+****************************************
+*             AREA DE EQUs             *
+*                                      *
+* Se definen labels que se utilizaran  *
+*            en la subrutina           *
+*                                      *
+****************************************
+
+N        EQU      6                  ;filas
+M        EQU      6                  ;columnas
+MATRIZ   EQU      N*M
+ROJO     EQU      00110000b          ;valor del color rojo
+VERDE    EQU      00001100b          ;valor del color verde
+AMA      EQU      00111100b          ;valor del color amarillo
+TOCAC    EQU      10111100b          ;valor que indica que un carguero ya está tocado
+MASC     EQU      11000000b          ;máscara utilizada para eliminar los colores
+BM       EQU      $5F00              ;comienzo del bitmap
+five     EQU      5
+six      EQU      6
+one      EQU      1
+
+
+
+****************************************
+*           SUBRUTINA DOFIRE           *
+*                                      *
+* Se encarga de analizar el indice que *
+* se disparo y dependiendo de lo que   *
+*    encontraba en la casilla manda    *
+*        el resultado al bitmap        *
+*                                      *
+****************************************
+
+          rseg    SUBR
+
+
+****************************************
+*               MODULO 1               *
+*                                      *
+*   Se encarga de imprimir la matriz   *
+*             en el bitmap             *
+*                                      *
+****************************************
+
+dofire    ldaa    flagp              ;toma el valor de la constante que indica el jugador
+          cmpa    #1                 ;si el valor es uno, está jugando el primer jugador
+          beq     pj
+          ldx     #MAPA2             ;si no es uno, toma el valor del inicio de la matriz de 2° jugador
+          jmp     impre
+pj        ldx     #MAPA1             ;toma el valor del comienzo de la matriz del primer jugador
+impre     ldy     #BM                ;toma el valor del comienzo del bitmap
+          %IMPR   MATRIZ             ;manda la matriz al bitmap
+
+
+****************************************
+*               MODULO 2               *
+*                                      *
+*     Se encarga de tomar el indice    *
+* disparado por stack y analizar que   *
+*      se encuentra en la casilla      *
+*                                      *
+****************************************
+
+          tsy                        ;crea el frame pointer
+          ldaa    flagp              ;toma el valor de la constante que indica el jugador
+          cmpa    #1
+          beq     pj1                ;si es uno, está jugando el primer jugador
+          jmp     sj1                ;si no es uno, está jugando el segundo jugador
+
+pj1       ldx     #MAPA1             ;toma el valor del comienzo de la matriz del primer jugador
+          jmp     indi
+sj1       ldx     #MAPA2             ;toma el valor del comienzo de la matriz del segundo jugador
+indi      ldaa    3,y                ;toma el índice de fila ingresado por stack
+          ldab    #AR_SIZE           ;toma el tamaño de las filas
+          mul
+          abx
+          ldaa    2,y                ;toma el índice de columna ingresado por stack
+          ldab    #EL_SIZE           ;toma el tamaño de las columnas
+          mul
+          abx                        ;obtiene la posición correspondiente a la casilla ingresada
+          ldaa    0,x                ;toma el valor que hay en la casilla
+          cmpa    #AGUA              ;analiza si hay agua en la casilla
+          beq     ag
+          cmpa    #BARC             ;analiza si hay barco en la casilla
+          beq     bc
+          cmpa    #CARG             ;analiza si hay un carguero en la casilla
+          beq     car
+          jmp     loop1
+
+
+****************************************
+*            MODULO DE AGUA            *
+*                                      *
+****************************************
+
+ag        anda    #MASC             ;si es agua la casilla, saca el color azul del byte
+          ldab    #VERDE            ;pasa a verde el byte
+          aba
+          staa    0,x               ;pasa el byte a verde a la matriz
+          jmp     loop1             ;salta al la impresión de la matriz al bitmap
+
+
+****************************************
+*           MODULO DE BARCO            *
+*                                      *
+****************************************
+
+bc        anda    #MASC             ;si es barco la casilla, sacar el color azul del byte
+          ldab    #ROJO             ;pasa a rojo el byte
+          aba
+          staa    0,x               ;pasa el byte a rojo a la matriz
+          ldab    flagp             ;toma el valor de la constante que indica el jugador
+          cmpb    #1                ;si es uno, está jugando el primer jugador
+          beq     cp1s
+cp2s      dec     winp2             ;decrementa el contador de barcos hundidos del segundo jugador
+          jmp     loop1
+cp1s      dec     winp1             ;decrementa el contador de barcos hundidos del primer jugador
+          jmp     loop1             ;salta a la impresión de la matriz al bitmap
+
+
+****************************************
+*          MODULO DE CARGUERO          *
+*                                      *
+****************************************
+
+car       anda    #MASC             ;si es carguero la casilla, saca el color azul del byte
+          stx     guardo            ;guarda la posición de la casilla
+          tsy
+          ldab    3,y               ;analiza si la fila es la primera
+          cmpb    #0
+          beq     fil0              ;la fila es la primera, analiza la columna
+          cmpb    #five             ;analiza si la fila es la última
+          beq     fil5              ;la fila es la última, analiza la columna
+          ldab    2,y               ;la fila no es ni la primera ni la última
+          cmpb    #0                ;analiza si la columna es la primera
+          beq     col0              ;la columna es la primera
+          cmpb    #five             ;analiza si la columna es la última
+          beq     col5              ;la columna es la última
+          jmp     red               ;no está en las primeras ni últimas filas y columnas
+
+
+fil0      ldab    2,y               ;analiza si la columna es la primera
+          cmpb    #0
+          beq      red                ;la fila y la columan son las primeras
+          cmpb     #five              ;analiza si la columna es la última
+          beq      col5               ;la fila es la primera y la columna la última
+          jmp      red                ;la fila es la primera,la Columna no es ni la primera ni la última
+
+fil5      ldab     2,y                ;analiza si la columna es la primera
+          cmpb     #0
+          beq      col0               ;la fila es la última, la columna la primera
+          jmp      red
+
+red       %ANALI   one                ;analiza lo que pasa en la posición a la derecha
+          cmpb     #TOCAC
+          beq      red1               ;si es un carguero ya tocado, pone en rojo las dos casillas
+
+col5      %ANALI   six                ;analiza lo que pasa en la posición por debajo de la casilla
+          cmpb     #TOCAC
+          beq      red1               ;si es un carguero ya tocado, pone en rojo las dos casillas
+
+          %ANALI2 six                 ;analiza lo que pasa en posición por arriba de la casilla
+          cmpb    #TOCAC
+          beq     red1                ;si es un carguero ya tocado, pone en rojo las dos casilla
+
+          %ANALI2 one                 ;analiza lo que pasa en la posición a la izquierda
+          cmpb    #TOCAC
+          beq     red1                ;si es un carguero ya tocado, pone en rojo las dos casillas
+          jmp     amari               ;no tiene cargueros tocados alrededor
+
+col0      %ANALI   one                ;analiza lo que pasa en la posición a la derecha
+          cmpb     #TOCAC
+          beq      red1               ;si es un carguero ya tocado, pone en rojo las dos casillas
+
+          %ANALI   six                ;analiza lo que pasa en la posición por debajo de la casilla
+          cmpb     #TOCAC
+          beq      red1               ;si es un carguero ya tocado, pone en rojo las dos casillas
+
+          %ANALI2 six                 ;analiza lo que pasa en posición por arriba de la casilla
+          cmpb    #TOCAC
+          beq     red1                ;si es un carguero ya tocado, pone en rojo las dos casilla
+          jmp     amari               ;no tiene cargueros tocados alrededor
+
+
+amari     ldab     #AMA               ;si no tiene alrededor cargueros tocados,pone casilla en amarillo
+          aba
+          staa     0,x                ;y la guarda en la matriz
+          jmp      loop1              ;salta a la impresión de la matriz al bitmap
+
+
+red1      ldab     #ROJO              ;pone en rojo la casilla disparada
+          aba
+          staa     0,x                ;y la guarda en la matriz
+          ldaa     0,y                ;toma el valor de la casilla ya tocada
+          anda     #MASC              ;aplica máscara para eliminar los colores que ya tenía
+          aba                         ;pone la casilla en rojo
+          staa     0,y                ;y la guarda en la matriz
+          ldab     flagp              ;toma el valor de la constante que indica el jugador
+          cmpb     #1                 ;si es uno, está jugando el primer jugador
+          beq      cp1
+cp2       dec      winp2              ;decrementa el contador de barcos hundidos del segundo jugador
+          jmp      loop1              ;salta a la impresión de la matriz al bitmap
+cp1       dec      winp1              ;decrementa el contador de barcos hundidos del primer jugador
+          jmp      loop1              ;salta a la impresión de la matriz al bitmap
+
+
+
+****************************************
+*                MODULO 3              *
+*                                      *
+*   Se encarga de imprimir la matriz   *
+*        modificada en el bitmap       *
+*                                      *
+****************************************
+
+loop1    ldaa    flagp              ;toma el valor de la constante que indica el jugador
+         cmpa    #1                 ;si es uno, está jugando el primer jugador
+         beq     pj2
+         ldx     #MAPA2             ;toma el valor de la matriz del segundo jugador
+         jmp     impre2
+
+pj2      ldx     #MAPA1             ;toma el valor de la matriz del primer jugador
+impre2   ldy     #BM
+         %IMPR   MATRIZ             ;imprime la matriz al bitmap correspondiente al jugador
+         rts
+
+
+****************************************
+*          AREA DE VARIABLES           *
+*                                      *
+*   Aqui se guardan las posiciones de  *
+*     memoria que seran usadas como    *
+*               variables              *
+*                                      *
+****************************************
+
+         rseg    VARS
+
+guardo   rmb     2
+
+
+
+         END

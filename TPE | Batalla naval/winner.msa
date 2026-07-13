@@ -1,0 +1,90 @@
+          p68H11
+
+          extern   flagp,BM
+          public   wins
+
+*************************************************************************
+*       DEFINICIONES                                                    *
+*                                                                        *
+*                                                                       *
+*                                                                        *
+*                                                                        *
+*                                                                       *
+*                                                                       *
+*                                                                       *
+*                                                                       *
+*************************************************************************
+
+CONTROL EQU        $5EFF              ;Control de modo de la matriz
+COL     EQU        $6                 ;Cantidad de columnas
+FIL     EQU        $6                 ;Cantidad de filas
+SIZE    EQU        COL*FIL
+
+RGB       EQU      0                  ;\
+GRB       EQU      1                  ;\=> Defino constantes para modo de lectura
+
+YELLOW    EQU      $28                ;\
+RED       EQU      $30                ;\
+BLUE      EQU      $02                ;\=> Máscaras para cada color en RGB, filtro tenue
+
+win       EQU      1                  ;Constante para verificar quién ganó
+
+*************************************************************************
+*       MAIN PROGRAM                                                    *
+*       Esta sección analiza qué jugador ganó el juego y muestra        *
+*       el mensaje de victoria acorde.                                  *
+*************************************************************************
+
+          rseg     SUBR
+
+wins      ldaa     #RGB               ;\
+          staa     CONTROL            ;\=> Defino modo de lectura
+          ldaa     flagp              ;\
+          cmpa     #win               ;\
+          beq      player1            ;\=> Si ganó el jugador 1, salta a player 1
+
+player2 ldx       #COLOR2            ;Si ganó el jugador 2, carga el dibujo de victoria del jugador 2
+        jmp       mostrar
+
+player1 ldx       #COLOR1            ;Carga el dibujo de victoria del jugador 1
+
+mostrar ldy       #BM                ;Carga el inicio de la matriz (bitmap)
+        ldab      #SIZE              ;Establece contador para copiar y pegar cada byte en el bitmap
+lop     ldaa      0,X                ;\
+        staa      0,Y                ;\
+        inx                          ;\
+        iny                          ;\
+        decb                         ;\
+        bne       lop                ;\=> Copia y pega cada color en el bitmap
+
+         rts
+
+*****************************************************************
+*       SECCION DE MATRICES                                             *
+*                                                                       *
+*                                                                       *
+*                                                                       *
+*                                                                       *
+*****************************************************************
+
+         rseg     CONST
+
+COLOR1   EQU      *
+         FCB      YELLOW,BLUE,YELLOW,YELLOW,BLUE,YELLOW
+         FCB      YELLOW,YELLOW,BLUE,RED,YELLOW,YELLOW
+         FCB      YELLOW,BLUE,RED,RED,BLUE,YELLOW
+         FCB      YELLOW,BLUE,BLUE,RED,BLUE,YELLOW
+         FCB      YELLOW,BLUE,BLUE,RED,BLUE,YELLOW
+         FCB      YELLOW,BLUE,BLUE,RED,BLUE,YELLOW
+
+         rseg     CONST
+
+COLOR2   EQU      *
+         FCB      YELLOW,BLUE,YELLOW,YELLOW,BLUE,YELLOW
+         FCB      YELLOW,YELLOW,RED,RED,YELLOW,YELLOW
+         FCB      YELLOW,RED,BLUE,BLUE,RED,YELLOW
+         FCB      YELLOW,BLUE,BLUE,RED,BLUE,YELLOW
+         FCB      YELLOW,BLUE,RED,BLUE,BLUE,YELLOW
+         FCB      YELLOW,RED,RED,RED,RED,YELLOW
+
+         END
