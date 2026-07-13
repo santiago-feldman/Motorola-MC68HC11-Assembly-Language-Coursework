@@ -1,0 +1,445 @@
+                 p68h11
+
+                 extern   show,division,multi,sumar,restar
+                 public   counter,msg,stackP,flagn1,flagn2,flags,flagr,outchar
+
+$display2.def
+*************************Ports****************************************
+
+DDRC             equ      $1007           ;data direction register for C
+PIOC             equ      $1002           ;for strobe B assertion change
+PORTCL           equ      $1005           ;port C latched
+PORTB            equ      $1004           ;port B
+PORTC            EQU      $1003           ;rows
+
+*******************Cols and Row Ports*********************************
+
+ROWS             EQU      PORTC           ;outputs
+COLS             EQU      PORTCL          ;inputs
+
+************************Row Masks*************************************
+
+FIL0             EQU      00001110b       ;mascaras para manejo de filas
+FIL1             EQU      00001101b
+FIL2             EQU      00001011b
+FIL3             EQU      00000111b
+
+**********************Keyboard Mask***********************************
+
+
+DI_START         EQU      $03
+DI_END           EQU      $00
+
+L                EQU      $3
+M                EQU      $FF
+S                EQU      $FF
+
+
+                 rseg     CODE
+
+
+                 jsr      initdis         ;se inicializa el display
+
+clearall         lds    #stackP
+
+                 clr    flagn1
+                 clr    flagn2
+                 clr    flags              ;se reinician los flags de operacion
+                 clr    flagr
+                 clr    flagm
+                 clr    flagd
+
+clear            ldab   #DI_START          ;toma el valor de la primera posición del display
+                 ldx    #4                 ;inicia contador de posiciones del display
+                 ldaa   #0                 ;toma el valor 0 para borrar el display
+cleandisp        jsr    outchar            ;llama a la subrutina para poner los valores del display
+                 decb                      ;decrementa la posición del display
+                 dex                       ;decrementa el contador de posiciones
+                 bne    cleandisp          ;si el contador no es 0 repite la secuencia
+
+primedisp        ldaa   #2
+                 staa   counter            ;se preparan las posiciones de memoria que funcionan
+                 ldaa   #0                 ;como contador y como retenedor de dígitos
+                 staa   msg
+
+
+
+****************************************
+*          SECCION DE LECTURA          *
+*                                      *
+* Esta parte del programa se encarga   *
+* de leer constantemente los valores   *
+* del Puerto C para fijarse si alguna  *
+*         tecla es presionada          *
+****************************************
+
+barrido          jsr    delay              ;se genera un poco de retraso en el barrido
+                                            ;para evitar presionar involuntariamente la misma tecla más de una vez
+
+                 ldab   #FIL0
+                 stab   PORTC              ;se prepara la máscara de la fila 0
+
+****************************************;SE PRESIONA EL BOTON
+
+                 ldaa   PORTC
+                 cmpa   #11101110b
+                 beq    read0
+                 cmpa   #11011110b
+                 beq    read1              ;se compara el valor del puerto c con los
+                 cmpa   #10111110b         ;valores correspondientes a cada tecla de la
+                 beq    read2              ;de la fila 0 detectar si se presionó una tecla
+                 cmpa   #01111110b
+                 beq    read3
+                 jmp    barrido1
+
+read0            jmp    write0
+read1            jmp    write1             ;se pasa a escribir el digito
+read2            jmp    write2             ;correspondiente a la tecla presionada
+read3            jmp    write3
+
+
+
+barrido1         ldab   #FIL1
+                 stab   PORTC           ;se prepara la máscara de la fila 1
+
+****************************************;SE PRESIONA EL BOTON
+
+                 ldaa   PORTC
+                 cmpa   #11101101b
+                 beq    read4
+                 cmpa   #11011101b
+                 beq    read5           ;se compara el valor del puerto c con los
+                 cmpa   #10111101b      ;valores correspondientes a cada tecla de la
+                 beq    read6           ;fila 1 para detectar si se presionó una tecla
+                 cmpa   #01111101b
+                 beq    read7
+                 jmp    barrido2
+
+read4            jmp    write4
+read5            jmp    write5          ;se pasa a escribir el digito
+read6            jmp    write6          ;correspondiente a la tecla presionada
+read7            jmp    write7
+
+
+barrido2         ldab   #FIL2
+                 stab   PORTC           ;se prepara la máscara de la fila 2
+
+****************************************;SE PRESIONA EL BOTON
+
+                 ldaa   PORTC
+                 cmpa   #11101011b
+                 beq    read8
+                 cmpa   #11011011b
+                 beq    read9           ;se compara el valor del puerto c con los
+                 cmpa   #10111011b      ;valores correspondientes a cada tecla de la
+                 beq    readsuma        ;fila 2 para detectar si se presionó una tecla
+                 cmpa   #01111011b
+                 beq    readresta
+                 jmp    barrido3
+
+read8            jmp    write8          ;se pasa a escribir el digito
+read9            jmp    write9          ;correspondiente a la tecla presionada
+readsuma         jmp    wsuma           ;se pasa a registrar el operando seleccionado
+readresta        jmp    wresta
+
+
+
+barrido3         ldab   #FIL3
+                 stab   PORTC           ;se prepara la máscara de la fila 3
+
+****************************************;SE PRESIONA EL BOTON
+
+                 ldaa   PORTC
+                 cmpa   #11100111b
+                 beq    readclear
+                 cmpa   #11010111b
+                 beq    readdivision    ;se compara el valor del puerto c con los
+                 cmpa   #10110111b      ;valores correspondientes a cada tecla de la
+                 beq    readmulti       ;fila 3 para detectar si se presionó una tecla
+                 cmpa   #01110111b
+                 beq    readigual
+                 jmp    barrido
+
+readclear        jmp    clearall
+readdivision     jmp    wdivision          ;se pasa a registrar el operando seleccionado
+readmulti        jmp    wmulti
+readigual        jmp    wigual
+
+
+
+****************************************
+*         SECCION DE ESCRITURA         *
+*                                      *
+* Esta parte del programa se encarga   *
+* de escribir los valores leidos por   *
+*    el teclado e impriirlos en el     *
+*               display                *
+****************************************
+
+                 rseg   CODE
+
+write0           ldaa   #0
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write1           ldaa   #1
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write2           ldaa   #2
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write3           ldaa   #3
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write4           ldaa   #4                 ;se guarda el valor presionado en el stack
+                 psha                      ;para ser recibido por la subrutina
+                 jsr    show               ;que lo muestra en el display.
+                 jmp    barrido            ;vuelve a leer
+
+write5           ldaa   #5
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write6           ldaa   #6
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write7           ldaa   #7
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write8           ldaa   #8
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+write9           ldaa   #9
+                 psha
+                 jsr    show
+                 jmp    barrido
+
+
+
+****************************************
+*        SECCION DE OPERACIONES        *
+*                                      *
+* Esta parte del programa se encarga   *
+*      de realizar las operaciones     *
+*       indicadas mediante el uso      *
+*              del teclado             *
+****************************************
+
+                 rseg   CODE
+
+wsuma            ldaa   counter            ;se fija si ya se ingresó la primer cifra del número
+                 cmpa   #2
+                 beq    endsuma            ;si no se ingresó no hace nada
+
+                 ldaa   #$2B               ;si se ingresó guarda el operando en el stack
+                 psha
+                 ldaa   #1                 ;y enciende el flag de suma para que se sepa
+                 staa   flags              ;la operacion a realizar cuando se presiona el igual
+
+endsuma          jmp    clear              ;salta a leer el principio de un numero
+
+
+wresta           ldaa   counter            ;se fija si ya se ingresó la primer cifra del número
+                 cmpa   #2
+                 bne    endresta           ;si ya se ingresó pasa a registrar el operando
+
+                 ldab   #DI_START          ;si no se ingresó imprime un signo menos al
+                 ldaa   #$2D               ;principio del display
+                 jsr    outchar
+
+                 ldaa   #1
+                 cmpa   flags
+                 beq    setflagn2
+                 cmpa   flagr              ;se fija si trabaja con el segundo número o el primero
+                 beq    setflagn2          ;si es con el segundo prende el flag que
+                 cmpa   flagm              ;indica que el segundo número es negativo
+                 beq    setflagn2
+                 cmpa   flagd
+                 beq    setflagn2
+
+                 staa   flagn1             ;si es con el primero prende el flag que
+                 jmp    barrido            ;indica que el primer número es negativo y vuelve a leer
+
+setflagn2        staa   flagn2
+                 jmp    barrido            ;vuelve a leer
+
+endresta         ldaa   #1
+                 staa   flagr              ;indica que la operación elegida fue la resta
+                 ldaa   #$2D               ;guarda el signo menos en el stack
+                 psha
+                 jmp    clear
+
+
+wmulti           ldaa   counter       ;se fija si ya se ingresó la primer cifra del número
+                 cmpa   #2
+                 beq    endmulti      ;si no se ingresó no hace nada
+
+                 ldaa   #$2A          ;si se ingresó guarda el operando en el stack
+                 psha
+                 ldaa   #1            ;y enciende el flag de multiplicación para
+                 staa   flagm         ;que se sepa la operación a realizar cuando se presiona el igual
+
+endmulti         jmp    clear         ;salta a leer el principio de un numero
+
+
+wdivision        ldaa   counter       ;se fija si ya se ingresó la primer cifra del número
+                 cmpa   #2
+                 beq    enddivision   ;si no se ingresó no hace nada
+
+                 ldaa   #$2F          ;si se ingresó guarda el operando en el stack
+                 psha
+                 ldaa   #1            ;y enciende el flag de división para que se
+                 staa   flagd         ;sepa la operación a realizar cuando se presiona el igual
+
+enddivision      jmp    clear         ;salta a leer el principio de un numero
+
+
+wigual           ldab   #DI_START     ;toma el valor de la primera posición del display
+                 ldx    #4            ;inicia contador de posiciones del display
+                 ldaa   #0            ;toma el valor 0 para borrar el display
+cleanigual       jsr    outchar       ;llama a la subrutina para poner los valores del display
+                 decb                 ;decrementa la posición del display
+                 dex                  ;decrementa el contador de posiciones
+                 bne    cleanigual    ;si el contador no es 0 repite la secuencia
+
+                 ldaa   #1
+                 cmpa   flags
+                 beq    dosuma
+                 cmpa   flagr
+                 beq    doresta       ;se fija que operación fue elegida
+                 cmpa   flagm
+                 beq    domulti
+                 cmpa   flagd
+                 beq    dodivision
+
+
+
+dosuma           jsr    sumar
+                 jmp    barrido
+doresta          jsr    restar
+                 jmp    barrido       ;salta a la subrutina de la operación
+domulti          jsr    multi
+                 jmp    barrido
+dodivision       jsr    division
+                 jmp    barrido
+
+
+
+****************************************
+*          SECCION DE SUBRUTINAS       *
+*                                      *
+*   Aquí se encuantran las subrutinas  *
+*    de delay, de inicializacion del   *
+* display y de envio de caracteres al  *
+*               display                *
+****************************************
+
+delay            rseg   SUBR
+
+                 org    *
+                 psha
+                 pshb                      ;se hace un backup de los registros a
+                 pshx                      ;modificas
+
+                 ldx    #L                 ;crea el contador mayor
+countl           dex
+                 beq    endelay            ;si es cero el contador mayor va a terminar el programa
+
+                 ldaa   #M                 ;si no es cero reinicia el contador mediano
+countm           deca
+                 beq    countl             ;si es cero el contador mediano pasa a decrementar el mayor
+
+                 ldab   #S                 ;si no es cero reinicia el contador menor
+counts           decb
+                 bne    counts
+                 jmp    countm             ;si es cero el contador menor decrementa el mediano
+
+endelay          pulx
+                 pulb                      ;se recuperan los valores guardados
+                 pula
+                 rts
+
+
+
+                 rseg   SUBR
+
+initdis          EQU    *
+
+                 psha
+
+                 ldaa   #$0F
+                 staa   DDRC               ;se prepara el display
+                 ldaa   PIOC
+                 anda   #$FE
+                 staa   PIOC
+
+                 pula
+                 rts
+
+outchar          EQU    *
+
+                 stab   PORTCL             ;se envían los caracteres
+                 staa   PORTB
+
+                 rts
+
+
+
+
+****************************************
+*          AREA DE VARIABLES           *
+*                                      *
+*   Aquí se guardan las posiciones de  *
+*     memoria que serán usadas como    *
+*               variables              *
+*                                      *
+****************************************
+
+                    rseg   VARS
+
+counter             rmb    1               ;este contador se guarda la cantidad de dígitos
+
+flags               rmb    1
+flagr               rmb    1               ;estos flags guardan la operación elegida
+flagm               rmb    1
+flagd               rmb    1
+
+flagn1              rmb    1               ;estos flags guardan el signo de los números
+flagn2              rmb    1
+
+                    fcb    0
+msg                 rmb    2               ;esto se usa para retener los dígitos de los números
+
+
+
+
+****************************************
+*            AREA DEL STACK            *
+*                                      *
+*   Aquí se guardan las posiciones de  *
+*     memoria que serán usadas como    *
+*                stack                 *
+*                                      *
+****************************************
+
+                    rseg   STACK
+stack               rmb    100
+stackP              EQU    *-1
+
+
+
+                    END

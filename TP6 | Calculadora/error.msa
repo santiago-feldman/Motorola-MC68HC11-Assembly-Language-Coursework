@@ -1,0 +1,44 @@
+                   p68h11
+
+
+
+                   public   error
+                   extern   initdis,outchar
+
+MISTAKE            EQU      $45
+
+DI_START           EQU      $03
+DI_END             EQU      $00
+
+
+
+                   rseg     SUBR
+
+error              psha                       ;hace backup de los registros
+                   pshb
+                   pshx
+                   pshy
+
+                   ldab     #DI_START         ;toma el valor de la primera posición del display
+                   ldx      #4                ;inicia contador de posiciones del display
+preperror          ldaa     #0                ;toma el valor 0 para borrar el display
+                   jsr      outchar           ;llama a la subrutina para poner los valores del display
+                  decb               ;decrementa la posición del display
+                  dex                ;decrementa el contador de posiciones
+                  bne    preperror   ;si el contador no es 0 repite la secuencia
+
+
+                  ldab   #DI_START   ;toma el valor de la primera posición del display
+                  ldaa   #MISTAKE    ;toma la letra E
+                  jsr    outchar     ;la manda al display
+
+                  puly               ;hace restore de los registros
+                  pulx
+                  pulb
+                  pula
+
+                  rts                ;vuelve al programa principal
+
+
+
+                  END

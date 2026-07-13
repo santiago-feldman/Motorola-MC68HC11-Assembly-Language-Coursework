@@ -1,0 +1,51 @@
+                 p68h11
+
+
+
+                 extern   outchar,counter,msg,error
+                 public   show
+
+DI_START         EQU      $03
+DI_END           EQU      $00
+
+
+
+                 rseg     SUBR
+
+show             ldab     #DI_END         ;toma el valor de la primera posición del display
+                 ldx      #3              ;inicia contador de posiciones del display
+                 ldaa     #0              ;toma el valor 0 para borrar el display
+cleanshow        jsr      outchar         ;llama a la subrutina para poner los valores del display
+                 incb                     ;decrementa la posición del display
+                 dex                      ;decrementa el contador de posiciones
+                 bne      cleanshow       ;si el contador no es 0 repite la secuencia
+
+                 ldy      #msg            ;se apunta IY a donde se guardaran los caracteres
+                 tsx                      ;se crea un frame pointer
+                 ldaa     2,x             ;se carga a con el ultimo digito tecleado
+                 ldab     #$30            ;se lo convierte a ASCII
+                 aba
+                 staa     1,y             ;se retiene al carácter en una posición de memoria
+                 dec      counter         ;se actualiza la cantidad de dígitos ingresados
+                 bmi      showerror       ;si se presionan tres dígitos seguidos, error
+                 bne      undigit         ;si el número es de un digito pasa a imprimirlo
+
+                 ldaa     3,x             ;si no carga el otro digito
+                 ldab     #$30            ;se lo convierte a ASCII
+                 aba
+                 staa     0,y             ;se retiene el carácter
+
+undigit            ldab     #DI_END
+
+dosdig             ldaa     1,y
+                   beq      endshow           ;se imprime el numero entero hasta ahora, ya
+                   jsr      outchar           ;sea de una o dos cifras
+                   incb
+                   dey
+                   bra      dosdig
+endshow            rts                        ;vuelve a barrer
+
+showerror          jsr      error
+                   jmp      endshow
+
+                   END

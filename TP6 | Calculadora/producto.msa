@@ -1,0 +1,253 @@
+                     p68H11
+
+                     extern   stackP,outchar,flagn1,flagn2,error
+                     public   multi
+
+*************************
+*       DEFINICIONES    *
+*************************
+
+DECENAS              EQU      $0A
+LIM_HIGH             EQU      $03
+LIM_LOW          EQU    $E7
+ASCII_HIGH       EQU    $64
+TERM             EQU    $45
+ENDSTACK         EQU    stackP+1
+DI_START         EQU    $03
+DI_END           EQU    $00
+
+*************************
+*       PRODUCTO        *
+*************************
+
+                 rseg   SUBR
+multi            pshx                    ;backup de los registros
+                 tsx                     ;crea frame pointer
+                 pshy
+                 psha
+                 pshb
+                 ldaa   #TERM
+                 staa   ENDSTACK         ;carga una posición anterior al comienzo del stack un número arbitrario
+
+
+*****************************************************************
+*       SECCIÓN DE RECIBO DE NÚMEROS                             *
+*                                                                *
+*       Se encarga de recibir los números ingresados             *
+*       por stack                                                *
+*                                                                 *
+*                                                                *
+*                                                                *
+*                                                                *
+*****************************************************************
+
+                 ldab   5,X              ;analiza el segundo número ingresado
+                 cmpb   #$2A             ;ve si es un operando o un dígito
+                 beq    undigito         ;si es el operando, el segundo número es de un dígito
+                 ldaa   #DECENAS         ;si es un dígito, el segundo número es de dos dígitos
+                 mul                     ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   4,X              ;toma las unidades del segundo número
+                 aba                     ;las suma a las decenas
+                 psha                    ;guarda el segundo número en hexadecimal en el stack
+                 jmp    primernro        ;analiza el primer número igresado
+
+undigito         ldaa   4,X              ;toma el único dígito del segundo número
+                 psha                    ;guarda el segundo número en hexadecimal en el stack
+                 jmp    primernro2       ;analiza el primer número ingresado
+
+primernro        ldab   8,X              ;toma el valor 8 lugares después del stack
+                 cmpb   #TERM            ; lo compara con un valor
+                 beq    undigito2        ;si es ese valor, el primer número tiene un dígito
+                 ldaa   #DECENAS         ;si no es ese valor, el primer número tiene dos dígitos
+                 mul                     ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   7,X              ;toma las unidades del primer número
+                 aba                     ;las suma a las decenas
+                 psha                    ;guarda el primer número en hexadecimal en el stack
+                 jmp    cuenta
+
+primernro2       ldab   7,X             ;toma el valor 8 lugares después del stack
+                 cmpb   #TERM           ;lo compara con un valor
+                 beq    undigito3       ;si es ese valor, el primer número tiene un dígito
+                 ldaa   #DECENAS        ;si no es ese valor, el primer número tiene dos dígitos
+                 mul                    ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   6,X             ;toma las unidades del primer número
+                 aba                    ;las suma a las decenas
+                 psha                   ;guarda el primer número en hexadecimal en el stack
+                 jmp    cuenta
+
+undigito2        ldab   7,X             ;toma el único dígito del primer número
+                 pshb                   ;guarda el primer número en hexadecimal en el stack
+                 jmp    cuenta
+
+undigito3        ldab   6,X             ;toma el único dígito del primer número
+                 pshb                   ;guarda el primer número en hexadecimal en el stack
+
+
+*****************************************
+*       PRODUCTO - CONTINUACIÓN         *
+*****************************************
+
+cuenta           pulb                   ;cargo el primer número
+                 pula                   ;cargo el segundo
+                 mul                    ;multiplico los números entre sí
+                 pshb                   ;guardo el resultado en el stack
+                 psha
+                 jmp    chk_rta         ;verifico la validez del resultado (el valor absoluto debe ser menor o igual a 999 o $3E7)
+
+*********************************
+*       VALIDEZ DEL RESULTADO   *
+*********************************
+
+chk_rta          pula
+                 cmpa   #LIM_HIGH
+                 bpl    no_valido       ;si el byte más significativo de la rta es mayor a $03, el resultado no es válido
+                 beq    chk_low         ;si el byte más significativo de la rta es igual a $03, verifica el byte menos significativo
+                 psha                   ;si el byte más significativo de la rta es menor a $03, el resultado es válido
+                 jmp    valido
+
+chk_low          pulb
+                 cmpb   #LIM_LOW
+                 bpl    no_valido2      ;si el byte menos significativo de la rta es mayor a $E7, el resultado no es válido
+                 pshb                   ;si el byte menos significativo de la rta es menor o igual a $E7, el resultado es válido
+                 psha
+                 jmp    valido
+
+no_valido        pulb                   ;restore de los registros
+no_valido2       pulb
+                 pula
+                 puly
+                 pulx
+                 jsr    error           ;salta a la subrutina error, que colocará el símbolo de error para mostrar en el display
+                 rts
+
+*****************************************
+*       CONVERSIÓN A ASCII Y DISPLAY    *
+*****************************************
+
+valido           pula                   ;extrae el resultado
+                 pulb
+                 cmpb   #ASCII_HIGH     ;ve si el byte menos significativo es mayor a $64 (100 decimal)
+                 bpl    casomayor       ;si es mayor, la rta está entre 100 y 1000 decimal
+                 adda   #0              ;actualiza el estado del CCR para que refleje el estado del byte más significativo
+                 bne    casomayor       ;si el byte más significativo no es nulo, la rta está entre 100 y 1000 decimal
+                 cmpb   #DECENAS        ;sino, la rta es menor a 100 decimal. Ahora, ve si es mayor a 10 decimal
+                 bpl    casomedio       ;si es mayor, la rta está entre 10 y 100 decimal
+                 jmp    casomenor       ;si es menor, la rta está entre 0 y 10
+
+casomayor        pshb                   ;hace un backup de la rta en hexa
+                 psha
+                 clra                   ;genera 3 espacios en el stack para guardar los dígitos en ascii
+                 psha
+                 psha
+                 psha
+
+                 pshy                   ;crea un FP
+                 tsy
+
+                 ldaa   5,Y             ;recupera el byte más significativo de la rta
+                 ldx    #ASCII_HIGH
+                 idiv                   ;divide la rta por 100 decimal
+
+                 pshx                   ;guarda el resultado en en stack
+                 ldx    #DECENAS
+                 idiv                   ;divide el resto por 10 decimal
+
+                 pshx                   ;guarda el resultado en el stack
+                 pshb                   ;guarda el resto en el stack
+
+                 ldab   #$30
+                 pula                   ;toma el dígito de las unidades
+                 aba                    ;lo convierte en ascii
+                 staa   4,Y             ;lo guarda en el stack
+
+                 pula
+                 pula                   ;toma el dígito de las decenas
+                 aba                    ;lo convierte en ascii
+                 staa   3,Y             ;lo guarda en el stack
+
+                 pula
+                 pula                   ;toma el dígito de las centenas
+                 aba                    ;lo convierte en ascii
+                 staa   2,Y          ;lo guarda en el stack
+
+                 ldab   #DI_END
+                 ldx    #3
+escribir         ldaa   4,Y          ;escribe el resultado en el display
+                 jsr    outchar      ;comienza escribiendo las unidades en la última
+                 dex                 ;posición del display. Sigue con las decenas y las
+                 beq    seg4_mayor   ;centenas, y luego salta a "seg4_mayor" para verificar
+                 incb                ;el símbolo del resultado.
+                 dey
+                 bra    escribir
+
+seg4_mayor       puly                ;"limpia" el stack y aumenta el valor del SP
+                 puly
+                 pulb
+                 puly
+                 pulb                ;restore de los registros
+                 pula
+                 puly
+                 pulx
+                 jmp    seg4
+
+casomedio        pshb                ;hace un backup de la rta en hexa
+                 psha
+                 clra                ;genera 2 espacios en el stack para guardar los dígitos en ascii
+                 psha
+                 psha
+                 pshy                ;crea un FP
+                 tsy
+                 ldaa   4,Y          ;recupera el byte más significativo de la rta
+                 ldx    #DECENAS
+                 idiv                ;divide el resto por 10 decimal
+                 pshx                ;guarda el resultado en el stack
+                 pshb                ;guarda el resto en el stack
+                 ldab   #$30
+                 pula                ;toma el dígito de las unidades
+                 aba                 ;lo convierte en ascii
+                 staa   3,Y          ;lo guarda en el stack
+                 pula
+                 pula                ;toma el dígito de las decenas
+                 aba                 ;lo convierte en ascii
+                 staa   2,Y          ;lo guarda en el stack
+                 ldab   #DI_END
+                 ldx    #2
+escribir2        ldaa   3,Y          ;escribe el resultado en el display
+                 jsr    outchar      ;comienza escribiendo las unidades en la última
+                 dex                 ;posición del display. Sigue con las decenas
+                 beq    seg4_medio   ;y luego salta a "seg4_medio" para verificar
+                 incb                ;el símbolo del resultado.
+                 dey
+                 bra    escribir2
+seg4_medio       puly                ;"limpia" el stack y aumenta el valor del SP
+                 puly
+                 puly
+                 pulb                ;restore de los registros
+                 pula
+                 puly
+                 pulx
+                 jmp    seg4
+
+casomenor             ldaa     #$30
+                      aba                      ;convierte la rta en ascii
+                      ldab     #DI_END
+                      jsr      outchar         ;carga el resultado en el display
+                      pulb                     ;restore de los registros
+                      pula
+                      puly
+                      pulx
+                      jmp      seg4            ;verifica el símbolo del resultado
+
+*************************
+*       SIGNO           *
+*************************
+
+seg4                  ldaa     flagn1
+                      cmpa     flagn2          ;ve si los signos de los números que se multiplicaron son iguales
+                      beq      endprod         ;si son iguales, el resultado es positivo
+                      ldaa     #$2D            ;si son distintos, el resultado es negativo.
+                      ldab     #DI_START       ;carga el símbolo "-" al display
+                      jsr      outchar
+endprod               rts
+
+                      END

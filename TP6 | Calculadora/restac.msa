@@ -1,0 +1,214 @@
+                    p68h11
+
+                    extern   stackP,outchar,flagn1,flagn2,error
+                    public   restar
+
+DI_START            EQU      $03
+DI_END              EQU      $00
+VARIAN              EQU      $45
+FINSTACK            EQU      stackP+1
+
+
+*********************************************************
+*   SUBRUTINA restar:                                    *
+*   esta subrutina toma los números ingresados por el    *
+*   usuario por stack, resta los números y manda el      *
+*   resultado al display                                 *
+*********************************************************
+
+                    rseg     SUBR
+
+restar              psha
+                 psha                   ;hago espacio en el stack para guardar los
+                 pshb                   ;números a utilizar y los ASCII del resultado
+                 tsy
+                 pshx                   ;hace backup de los registros
+                 pshy
+                 ldaa   #VARIAN
+                 staa   FINSTACK        ;carga una posición anterior al comienzo del stack un número arbitrario
+
+
+
+*********************************************************
+*   SECCIÓN DE RECIBO DE NÚMEROS                         *
+*   esta sección se encarga de tomar los números         *
+*   ingresados usuario por stack                         *
+*********************************************************
+
+                 ldab   6,y             ;analiza el segundo número ingresado
+                 cmpb   #$2D            ;ve si es un operando o un dígito
+                 beq    lp              ;si es el operando, el segundo número es de un dígito
+                 ldaa   #$A             ;si es un dígito, el segundo número es de dos dígitos
+                 mul                    ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   5,y             ;toma las unidades del segundo número
+                 aba                    ;las suma a las decenas
+                 staa   1,y             ;guarda el segundo número en hexadecimal en el stack
+                 jmp    lp1             ;analiza el primer número igresado
+
+lp               ldaa   5,y             ;toma el único dígito del segundo número
+                 staa   1,y             ;guarda el segundo número en hexadecimal en el stack
+                 jmp    lp2             ;analiza el primer número ingresado
+
+lp1              ldab   9,y             ;toma el valor 9 lugares después del stack
+                 cmpb   #VARIAN         ; lo compara con un valor
+                 beq    lp3             ;si es ese valor, el primer número tiene un dígito
+                 ldaa   #$A             ;si no es ese valor, el primer número tiene dos dígitos
+                 mul                    ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   8,y             ;toma las unidades del primer número
+                 aba                    ;las suma a las decenas
+                 staa   2,y             ;guarda el primer número en hexadecimal en el stack
+                 jmp    negat           ;analiza si son negativos
+
+lp2              ldab   8,y             ;toma el valor 8 lugares después del stack
+                 cmpb   #VARIAN         ; lo compara con un valor
+                 beq    lp4             ;si es ese valor, el primer número tiene un dígito
+                 ldaa   #$A             ;si no es ese valor, el primer número tiene dos dígitos
+                 mul                    ;multiplica el dígito por 10, lo transforma a decenas
+                 ldaa   7,y             ;toma las unidades del primer número
+                 aba                    ;las suma a las decenas
+                 staa   2,y             ;guarda el primer número en hexadecimal en el stack
+                 jmp    negat           ;analiza si son negativos
+
+lp3              ldab   8,y             ;toma el único dígito del primer número
+                 stab   2,y             ;guarda el primer número en hexadecimal en el stack
+                 jmp    negat           ;analiza si son negativos
+lp4              ldab   7,y             ;toma el único dígito del primer número
+                 stab   2,y             ;guarda el primer número en hexadecimal en el stack
+                 jmp    negat           ;analiza si son negativos
+
+
+
+negat            ldaa   flagn1          ;toma el valor del indicador de negatividad del primer número
+                 cmpa   #1
+                 beq    compl1          ;el primer número es negativo, hace el complemento a 2
+                 bra    negat2          ;el primer número es positivo, analizo el segundo
+
+
+
+compl1           ldaa   2,y             ;toma el valor del primer número
+                 nega                   ;hace el complemento a 2
+                 staa   2,y             ;lo guarda nuevamente
+                 bra    negat2          ;analizo el segundo
+
+negat2           ldaa   flagn2          ;toma el valor del indicador de negativdad del segundo número
+                 cmpa   #1
+                 beq    sherror         ;el segundo número es negativo, hace error
+                 bra    ope             ;el segundo número es positivo, hace la operación
+
+sherror          puly                   ;hace restore de los registros
+                 pulx
+                 pulb
+                 pula
+                 pula
+                 jsr    error           ;manda E al display
+                 rts
+
+
+*********************************************************
+*   SECCIÓN DE OPERACIÓN                                 *
+*   esta sección se encarga de restar los números        *
+*   recibiendolos por stack y devuelve el resultado por *
+*   stack                                                *
+*********************************************************
+
+ope              equ    *
+                 ldaa   2,y             ;toma el valor del primer número
+                 ldab   1,y             ;toma el valor del segundo número
+                 negb
+                 aba                    ;los suma
+                 bvs    sig
+                 bmi    sig             ;si el resultado es negativo, hace el complemento a 2
+                 staa   0,y             ;si no es negativo el resultado, lo guarda
+                 jmp    dis2
+
+sig              nega                   ;hace el complemento a 2 del resultado
+                 staa   0,y             ;lo guarda nuevamente
+                 ldab   #DI_START       ;toma el valor de la primera posición del display
+                 ldaa   #$2D            ;toma el valor ASCII del signo menos
+                 jsr    outchar         ;lo manda al display
+                 jmp    dis2
+
+
+
+
+*********************************************************
+*   SECCIÓN DE TRANSFORMACÓN A ASCII Y DISPLAY           *
+*   esta sección se encarga de transformar el resultado *
+*   en ASCII y mandarlo al display                       *
+*********************************************************
+
+dis2             ldaa   0,y             ;toma el resultado de la suma
+                 cmpa   #$A             ;ve si el número se encuentra entre 0-9
+                 blo    lp5             ;si se encuentra entre 0-9, pasa a ASCII ese dígito
+                 cmpa   #99             ;ve si el número es mayor a 100
+                 bhi    lp6
+                 clra
+                 ldab   0,y             ;si es mayor a 9 y menor a 100, toma nuevamente el resultado
+                 ldx    #$A
+                 idiv                   ;divide el resultado por 10
+                 stx    0,y             ;guarda el primer dígito del resultado
+                 stab   0,y             ;guarda el segundo digito del resultado
+                 ldaa   #0
+                 staa   2,y             ;pone en 0 la posición de centenas
+
+                 ldaa   1,y             ;toma el primer dígito del resultado
+                 ldab   #$30
+                 aba                    ;lo convierte en ASCII
+                 staa   1,y             ;guarda el primer dígito en ASCII (decenas)
+                 ldaa   0,y             ;toma el segundo dígito del resultado
+                 aba                    ;lo transforma en ASCII
+                 staa   0,y             ;guarda el segundo dígito en ASCII
+                 jmp    dis1
+
+lp5              ldaa   0,y             ;toma el resultado
+                 ldab   #$30
+                 aba                    ;lo transgorma en ASCII
+                 staa   0,y             ;lo guarda nuevamente (unidades)
+                 ldaa   #0
+                 staa   1,y             ;pone en 0 la posición de decenas
+                 staa   2,y             ;pone en 0 la posición de centenas
+                 jmp    dis1
+
+lp6              clra
+                 ldab   0,y             ;si es mayor a 100, toma el resultado
+                 ldx    #$64
+                 idiv                   ;divide el resultado por 100
+                 stx    1,y             ;guarda el primer dígito del resultado
+                 ldx    #$A
+                 idiv                   ;divido el resto por 10
+                 stx    0,y             ;guarda del segundo dígito del resultado
+                 stab   0,y             ;guarda el tercer dígito del resultado
+
+                 ldaa   2,y             ;toma el primer dígito del resultado
+                 ldab   #$30
+                 aba                    ;lo transforma a ASCII
+                 staa   2,y             ;guarda el primer dígito en ASCII
+                 ldaa   1,y             ;toma el segundo dígito del resultado
+                 aba                    ;lo transforma a ASCII
+                 staa   1,y             ;guarda el segundo dígito en ASCII
+                 ldaa   0,y             ;toma el tercer dígito del resultado
+                 aba                    ;lo tranforma a ASCII
+                     staa     0,y             ;guarda el tercer dígito en ASCII
+                     jmp      dis1
+
+
+
+
+dis1                 ldab     #DI_END         ;toma el valor de la última posición del display
+                     ldx      #3              ;inicia contador de números a mostrar
+repit                ldaa     0,y             ;toma el dígito en ASCII
+                     jsr      outchar         ;lo manda al display
+                     dex                      ;decremento el contador
+                     beq      thee            ;si el contador es 0, termino la subrutina
+                     incb                     ;si no es cero el contador, toma el valor de la anterior posición del display
+                     iny                      ;apunta al siguiente dígito
+                     bra      repit           ;repite proceso
+
+thee                 puly
+                     pulx
+                     pulb
+                     pula
+                     pula
+                     rts
+
+                     END
