@@ -1,0 +1,40 @@
+                p68h11
+
+
+
+                public  delay
+
+
+
+L               EQU     $8
+M               EQU     $FF
+S               EQU     $DF
+
+
+
+                rseg    SUBR
+
+delay           org     *
+                psha
+                pshb            ;se hace un backup de los registros a modificar
+                pshx
+
+                ldx     #L      ;crea el contador mayor
+countl          dex
+                beq     endsrt1 ;si es cero el contador mayor va a terminar el programa
+
+                ldaa    #M      ;si no es cero reinicia el contador mediano
+countm          deca
+                beq     countl  ;si es cero el contador mediano pasa a decrementar el mayor
+
+                ldab    #S      ;si no es cero reinicia el contador menor
+counts          decb
+                bne     counts
+                jmp     countm  ;si es cero el contador menor decrementa el mediano
+
+endsrt1         pulx
+                pulb            ;se recuperan los valores guardados
+                pula
+                rts
+
+                END

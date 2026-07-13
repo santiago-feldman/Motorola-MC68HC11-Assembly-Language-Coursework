@@ -1,0 +1,147 @@
+                p68h11
+
+
+                extern  initdis,outchar,delay
+
+DI_START        EQU     $03
+DI_END          EQU     $00
+
+*****************************************************************
+*  MAIN PROGRAM: se encarga de borrar lo que se encuentra       *
+*  en el display, de ver hacia que lado es el desplazamiento    *
+*  y de  llamar a las subrutinas la  cantidad de veces          *
+*  necesarias para que se muestre la frase completa             *
+*****************************************************************
+
+rotar           EQU     0       ;variable que define hacia que lado se muestra la frase
+
+                rseg    CODE
+
+                jsr     initdis     ;necesario para iniciar el display
+
+                ldab    #DI_START   ;toma el valor de la primera posici¢n del display
+                ldx     #4          ;inicia contador de posiciones del display
+loop            ldaa    #0          ;toma el valor 0 para borrar el display
+                jsr     outchar     ;llama a la subrutina para poner valores del display
+                decb                ;decrementa la posici¢n del display
+                dex                 ;decrementa el contador de posiciones
+                bne     loop        ;si el contador no es 0 repite la secuencia
+
+                lds     #stackp     ;necesario para el stack y la subrutina
+                ldaa    #rotar      ;toma el valor de la variable que indica el movimiento
+                beq     der         ;si es 0 la variable, mu‚vase de derecha a izquierda
+                jmp     izq         ;si no es 0, el moviemiento es de izquierda a derecha
+
+der             ldy     #long       ;inicia contador de longitud de la frase
+                ldx     #msg        ;apunta al primer caracter
+repeat          jsr     subr1       ;salta a la subrutina adecuada
+                jsr     delay       ;llama a la subrutina que genera el delay
+                inx                 ;incrementa el puntero de los caracteres
+                dey                 ;decrementa el contador
+                beq     der         ;si el contador es 0, repite el proceso
+                jmp     repeat      ;si el contador no es 0, repite la secuencias
+
+izq             ldy     #long       ;inicia contador de longitud de la frase
+                ldx     #msg2       ;apunta al £ltimo caracter
+repeat2         jsr     subr2       ;salta a la subrutina adecuada
+                jsr     delay       ;llama a la subrutina que genera el delay
+                dex                 ;decrementa el puntero de los caracteres
+                dey                 ;decrementa el contador
+                beq     izq         ;si el contador es 0, repite el proceso
+                jmp     repeat2     ;si el contador no es 0, repite la secuencias
+
+
+
+
+****************************************************
+*  SUBRUTINA SUBR1: esta subrutina se encarga de   *
+*  poner en el display 4 letras de la frase con un *
+*  movimiento de derecha a izquierda               *
+****************************************************
+
+
+subr1           rseg    SUBR
+
+                psha                ;hace backup de los registros
+                pshb
+                pshx
+                pshy
+                ldy     #4          ;inicia contador de caracteres a mostrar
+                ldab    #DI_START   ;toma el valor de la £ltima posici¢n del display
+loop2           ldaa    0,x         ;toma el un caracter de la frase
+                jsr     outchar     ;llama a la subrutina para poner valores del display
+                dey                 ;decrementa contador de caracteres
+                beq     ter         ;si el contador es 0, termina la subrutina
+                inx                 ;si no es 0, incrementa el puntero de los caracteres
+                decb                ;decrementa la posici¢n del display
+                jmp     loop2       ;vuelve a repetir la secuencia
+ter             puly                ;hace restore de los registros
+                pulx
+                pulb
+                pula
+
+                rts                 ;retorna de la subrutina
+
+
+****************************************************
+*  SUBRUTINA SUBR2: esta subrutina se encarga de   *
+*  poner en el display 4 letras de la frase con un *
+*  movimiento de izquierda a derecha               *
+****************************************************
+
+
+subr2           rseg    SUBR
+
+                psha                ;hace backup de los registros
+                pshb
+                pshx
+                pshy
+                ldy     #4          ;inicia contador de caracteres a mostrar
+                ldab    #DI_END     ;toma el valor de la £ltima posici¢n del display
+loop3           ldaa    0,x         ;toma el un caracter de la frase
+                jsr     outchar     ;llama a la subrutina para poner valores del display
+                dey                 ;decrementa contador de caracteres
+                beq     ter2        ;si el contador es 0, termina la subrutina
+                dex                 ;si no es 0, decrementa el puntero de los caracteres
+                incb                ;incrementa la posici¢n del display
+                jmp     loop3       ;vuelve a repetir la secuencia
+ter2            puly                ;hace restore de los registros
+                pulx
+                pulb
+                pula
+
+                rts                 ;retorna de la subrutina
+
+
+************************************************************
+*  µREA DE DATOS: Lista de caracteres ASCII que componenen *
+*  la frase a mostrar en el display                        *
+************************************************************
+
+
+                rseg    CONST
+
+                fcb     0
+msg             fcb     0           ;necesarios para el comienzo de la muestra de la frase
+                fcb     0
+                fcb     0
+                fcc     'ITBA GRUPO 4';define la frase que se quiere mostrar
+                fcb     0           ;terminador
+                fcb     0           ;necesarios para el final de la muestra de la frase
+msg2            fcb     0
+                fcb     0
+long            equ     *-msg       ;define la longitud de la frase con m s par metros
+
+
+************************************************************
+*  µREA DE STACK: reserva las posiciones del stack         *
+*  con un margen extra                                     *
+************************************************************
+
+
+                rseg    STACK
+stack           rmb     100
+stackp          EQU     *-1
+
+
+                END

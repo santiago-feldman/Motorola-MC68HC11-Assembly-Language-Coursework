@@ -1,0 +1,37 @@
+                p68h11
+                rseg    SUBR
+
+                public  initdis,outchar
+
+        $display.def
+DDRC            equ     $1007           ;data direction register for C
+PIOC            equ     $1002           ;for strobe B assertion change
+PORTCL          equ     $1005           ;port C latched
+PORTB           equ     $1004           ;port B
+
+initdis         equ     *
+
+                psha
+
+                ldaa    #$FF            ;set for output
+                staa    DDRC            ;C output
+                ldaa    PIOC            ;get current value
+                anda    #$FE            ;reset bit 0 to 0
+                staa    PIOC            ;send it out
+
+                pula
+
+                rts
+
+**************************************
+* Outchar: ACCA: Car cter a enviar
+*          ACCB: Posici¢n (0-3)
+**************************************
+
+outchar         equ     *
+
+                stab    PORTCL          ;set the position
+                staa    PORTB           ;set the character
+
+                rts
+                END

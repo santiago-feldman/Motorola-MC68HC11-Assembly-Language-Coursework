@@ -1,0 +1,4 @@
+DDRC       equ  $1007       ;data direction register for C
+PIOC       equ  $1002       ;for strobe B assertion change
+PORTCL          equ  $1005  ;port C latched
+PORTB           equ  $1004  ;port B
