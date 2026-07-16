@@ -1,5 +1,4 @@
-# Motorola-MC68HC11-Assembly-Language-Coursework
-## Introduction to Computing (Motorola MC68HC11 Assembly Language Programming) | ITBA
+# Introduction to Computing (Motorola MC68HC11 Assembly Language Programming) | ITBA
 
 This repository contains the practical assignments done for the "22.06 Introduction to computing" subject at Instituto Tecnológico de Buenos Aires:
 
